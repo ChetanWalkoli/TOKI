@@ -11,6 +11,7 @@ export default function Kanban({ todos, onAdd, onEdit }) {
   const [dragOverColumn, setDragOverColumn] = useState(null);
   const [quickAddColumn, setQuickAddColumn] = useState(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
+  const [mobileTab, setMobileTab] = useState('all');
 
   const columns = [
     { id: 'todo',        title: 'To Do',       color: 'var(--color-butter)' },
@@ -34,27 +35,63 @@ export default function Kanban({ todos, onAdd, onEdit }) {
     setQuickAddTitle(''); setQuickAddColumn(null);
   };
 
+  const visibleColumns = mobileTab === 'all' ? columns : columns.filter((c) => c.id === mobileTab);
+
   return (
     <motion.div
-      className="flex flex-col gap-6 h-full"
+      className="flex flex-col gap-5 h-full max-w-7xl 2xl:max-w-[1600px] mx-auto w-full"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase">Flow & Momentum</p>
-          <h1 className="font-['Fraunces'] text-3xl font-semibold text-[var(--color-ink)]">Kanban Board</h1>
+          <h1 className="font-['Fraunces'] text-2xl sm:text-3xl font-semibold text-[var(--color-ink)]">Kanban Board</h1>
         </div>
-        <button type="button" onClick={() => onAdd({ status: 'todo' })}
-          className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-coral)] text-white text-sm font-semibold hover:bg-[var(--color-coral-hover)] transition-colors">
+        <button type="button" onClick={() => onAdd({ status: mobileTab !== 'all' ? mobileTab : 'todo' })}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[var(--color-coral)] text-white text-sm font-semibold hover:bg-[var(--color-coral-hover)] transition-colors">
           <Plus size={15} /> New task
         </button>
       </div>
 
+      {/* Mobile column switcher pills */}
+      <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setMobileTab('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+            mobileTab === 'all'
+              ? 'bg-[var(--color-coral)] text-white'
+              : 'bg-[var(--color-paper-card)] border border-[var(--color-line)] text-[var(--color-ink-secondary)]'
+          }`}
+        >
+          All Columns
+        </button>
+        {columns.map((col) => {
+          const count = todos.tasks.filter((t) => (t.status || (t.completed ? 'done' : 'todo')) === col.id).length;
+          return (
+            <button
+              key={col.id}
+              type="button"
+              onClick={() => setMobileTab(col.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                mobileTab === col.id
+                  ? 'bg-[var(--color-coral)] text-white'
+                  : 'bg-[var(--color-paper-card)] border border-[var(--color-line)] text-[var(--color-ink-secondary)]'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+              <span>{col.title}</span>
+              <span className="text-[10px] opacity-75">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Board */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
-        {columns.map((col) => {
+        {visibleColumns.map((col) => {
           const colTasks = todos.tasks.filter((t) => (t.status || (t.completed ? 'done' : 'todo')) === col.id);
           const isOver = dragOverColumn === col.id;
 

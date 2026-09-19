@@ -173,7 +173,7 @@ export default function TaskForm({
   const candidateDependencies = allTasks.filter((t) => !task || t.id !== task.id);
 
   return (
-    <form className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-1" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-4 pr-1" onSubmit={handleSubmit}>
       {/* Title + NLP Parser & AI Trigger */}
       <div>
         <div className="flex items-center justify-between mb-1.5">

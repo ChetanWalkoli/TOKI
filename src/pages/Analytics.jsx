@@ -39,7 +39,7 @@ export default function Analytics({ todos, pomodoro }) {
 
   return (
     <motion.div
-      className="max-w-3xl mx-auto flex flex-col gap-8"
+      className="max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto flex flex-col gap-8"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}

@@ -61,8 +61,18 @@ export default function AppShell({
               </div>
             )}
 
-            {/* Search */}
-            <label className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-card)] text-[var(--color-muted)] text-sm cursor-text min-w-[180px]">
+            {/* Mobile search button */}
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              aria-label="Search and command palette"
+              className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-[var(--color-paper-deep)] transition-colors"
+            >
+              <Search size={16} />
+            </button>
+
+            {/* Search input (tablets & desktops) */}
+            <label className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-card)] text-[var(--color-muted)] text-sm cursor-text min-w-[180px] lg:min-w-[220px]">
               <Search size={14} className="shrink-0" />
               <input
                 type="search"
@@ -138,9 +148,11 @@ export default function AppShell({
           </div>
         </header>
 
-        {/* Page content */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8 md:py-8">
-          {children}
+        {/* Page content with mobile bottom navigation clearance and TV/Ultrawide centering */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 md:px-8 md:py-8 pb-24 lg:pb-8">
+          <div className="max-w-7xl 2xl:max-w-[1500px] 3xl:max-w-[1700px] mx-auto w-full">
+            {children}
+          </div>
         </div>
       </main>
 

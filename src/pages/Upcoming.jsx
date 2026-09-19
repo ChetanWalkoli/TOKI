@@ -25,7 +25,7 @@ export default function Upcoming({ todos, onEdit, onAdd, settings, onStartFocus 
 
   return (
     <motion.div
-      className="max-w-2xl mx-auto flex flex-col gap-6"
+      className="max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto flex flex-col gap-6"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}

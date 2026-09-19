@@ -103,7 +103,7 @@ export default function ProjectDetail({
   const aiSummary = summarizeProject(project, tasks);
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full p-4 lg:p-8">
+    <div className="flex flex-col gap-6 max-w-5xl 2xl:max-w-6xl mx-auto w-full">
       {/* Top Nav Back button */}
       <div className="flex items-center justify-between">
         <button
