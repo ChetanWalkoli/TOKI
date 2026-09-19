@@ -12,11 +12,22 @@ import {
   Search,
   User,
   LogIn,
+  FolderGit2,
+  WifiOff,
 } from 'lucide-react';
 import { NavLink, Link } from 'react-router-dom';
 import { isToday, isOverdue } from '../../utils/task';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
-export default function Sidebar({ tasks = [], streak = 0, user = null, profile = null, onOpenCommandPalette }) {
+export default function Sidebar({
+  tasks = [],
+  projects = [],
+  streak = 0,
+  user = null,
+  profile = null,
+  onOpenCommandPalette,
+}) {
+  const isOnline = useOnlineStatus();
   const activeTasks = tasks.filter((t) => !t.completed);
   const todayCount = activeTasks.filter((t) => isToday(t.dueDate) || isOverdue(t)).length;
   const tomorrowOrLaterCount = activeTasks.filter((t) => t.dueDate && !isToday(t.dueDate) && !isOverdue(t)).length;
@@ -24,6 +35,7 @@ export default function Sidebar({ tasks = [], streak = 0, user = null, profile =
   const navItems = [
     { to: '/', label: 'Dashboard', icon: Home },
     { to: '/tasks', label: 'Tasks', icon: CheckSquare, badge: activeTasks.length > 0 ? activeTasks.length : null },
+    { to: '/projects', label: 'Projects', icon: FolderGit2, badge: projects.length > 0 ? projects.length : null },
     { to: '/board', label: 'Board', icon: Kanban },
     { to: '/today', label: 'Today', icon: CalendarDays, badge: todayCount > 0 ? todayCount : null, alert: activeTasks.some(isOverdue) },
     { to: '/upcoming', label: 'Upcoming', icon: Sunrise, badge: tomorrowOrLaterCount > 0 ? tomorrowOrLaterCount : null },
@@ -123,6 +135,13 @@ export default function Sidebar({ tasks = [], streak = 0, user = null, profile =
             <LogIn size={14} />
             <span>Sign in to sync</span>
           </Link>
+        )}
+
+        {!isOnline && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--color-butter-subtle)] text-[var(--color-butter)] text-xs font-semibold">
+            <WifiOff size={13} />
+            <span>Offline (Changes queued)</span>
+          </div>
         )}
 
         {/* Settings */}

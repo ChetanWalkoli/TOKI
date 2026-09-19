@@ -28,6 +28,11 @@ import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
+import PlanMyDayModal from './components/tasks/PlanMyDayModal';
+import AIAssistantModal from './components/common/AIAssistantModal';
+import ConflictResolutionModal from './components/common/ConflictResolutionModal';
 import { clearStore } from './services/storage';
 
 function AppContent() {
@@ -57,6 +62,15 @@ function AppContent() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [planMyDayOpen, setPlanMyDayOpen] = useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [aiTargetTask, setAiTargetTask] = useState(null);
+
+  const handleOpenPlanMyDay = () => setPlanMyDayOpen(true);
+  const handleOpenAIAssistant = (task = null) => {
+    setAiTargetTask(task);
+    setAiAssistantOpen(true);
+  };
 
   const handleOpenAdd = (prefill = {}) => {
     setEditingTask({
@@ -178,6 +192,7 @@ function AppContent() {
   return (
     <AppShell
       tasks={todos.tasks}
+      projects={todos.projects}
       streak={todos.streak}
       user={user}
       profile={profile}
@@ -197,6 +212,7 @@ function AppContent() {
               onEdit={handleOpenEdit}
               settings={settings}
               onStartFocus={handleStartFocusForTask}
+              onOpenPlanMyDay={handleOpenPlanMyDay}
             />
           }
         />
@@ -212,6 +228,32 @@ function AppContent() {
               settings={settings}
               onClearCompleted={() => setConfirmClearOpen(true)}
               onStartFocus={handleStartFocusForTask}
+            />
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <Projects
+              projects={todos.projects}
+              tasks={todos.tasks}
+              onCreateProject={todos.createProject}
+              onDeleteProject={todos.deleteProject}
+            />
+          }
+        />
+        <Route
+          path="/projects/:id"
+          element={
+            <ProjectDetail
+              projects={todos.projects}
+              tasks={todos.tasks}
+              todos={todos}
+              onAdd={handleOpenAdd}
+              onEdit={handleOpenEdit}
+              onStartFocus={handleStartFocusForTask}
+              onUpdateProject={todos.updateProject}
+              onDeleteProject={todos.deleteProject}
             />
           }
         />
@@ -234,6 +276,7 @@ function AppContent() {
               onEdit={handleOpenEdit}
               settings={settings}
               onStartFocus={handleStartFocusForTask}
+              onOpenPlanMyDay={handleOpenPlanMyDay}
             />
           }
         />
@@ -306,8 +349,14 @@ function AppContent() {
         <TaskForm
           task={editingTask}
           defaults={settings}
+          projects={todos.projects}
+          allTasks={todos.tasks}
+          currentUser={user}
           onSave={handleSaveTask}
           onCancel={handleCloseModal}
+          onOpenAIAssistant={(formState) => {
+            handleOpenAIAssistant({ ...editingTask, ...formState });
+          }}
         />
       </Modal>
 
@@ -331,8 +380,11 @@ function AppContent() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         tasks={todos.tasks}
+        projects={todos.projects}
         onOpenAdd={handleOpenAdd}
         onEditTask={handleOpenEdit}
+        onOpenPlanMyDay={handleOpenPlanMyDay}
+        onOpenAIAssistant={() => handleOpenAIAssistant(null)}
         theme={settings.theme}
         onToggleTheme={handleToggleTheme}
         onOpenShortcuts={() => setShortcutsModalOpen(true)}
@@ -349,6 +401,75 @@ function AppContent() {
         open={todos.hasLocalTasksToMigrate}
         onConfirm={todos.migrateLocalToCloud}
         onDismiss={todos.dismissMigration}
+      />
+
+      {/* Plan My Day Modal */}
+      <PlanMyDayModal
+        open={planMyDayOpen}
+        onClose={() => setPlanMyDayOpen(false)}
+        tasks={todos.tasks}
+        onApplyPlan={() => {
+          setPlanMyDayOpen(false);
+        }}
+      />
+
+      {/* AI Task Assistant Modal */}
+      <AIAssistantModal
+        open={aiAssistantOpen}
+        onClose={() => {
+          setAiAssistantOpen(false);
+          setAiTargetTask(null);
+        }}
+        initialTask={aiTargetTask}
+        projects={todos.projects}
+        allTasks={todos.tasks}
+        onApplySubtasks={(chosen) => {
+          if (editingTask) {
+            setEditingTask((prev) => ({
+              ...prev,
+              subtasks: [
+                ...(prev?.subtasks || []),
+                ...chosen.map((c) => ({ id: crypto.randomUUID(), title: c.title, completed: false })),
+              ],
+            }));
+          } else if (aiTargetTask?.id) {
+            chosen.forEach((st) => todos.addSubtask(aiTargetTask.id, st.title));
+          }
+        }}
+        onApplyEstimates={(est) => {
+          if (editingTask) {
+            setEditingTask((prev) => ({
+              ...prev,
+              estimatedMinutes: est.estimatedMinutes,
+              priority: est.priority,
+            }));
+          } else if (aiTargetTask?.id) {
+            todos.updateTask(aiTargetTask.id, {
+              estimatedMinutes: est.estimatedMinutes,
+              priority: est.priority,
+            });
+          }
+        }}
+        onApplyDescription={(desc) => {
+          if (editingTask) {
+            setEditingTask((prev) => ({
+              ...prev,
+              description: desc,
+            }));
+          } else if (aiTargetTask?.id) {
+            todos.updateTask(aiTargetTask.id, {
+              description: desc,
+            });
+          }
+        }}
+      />
+
+      {/* Conflict Resolution Modal */}
+      <ConflictResolutionModal
+        open={todos.pendingConflict !== null}
+        conflict={todos.pendingConflict}
+        onClose={() => todos.setPendingConflict(null)}
+        onResolve={todos.resolveConflict}
       />
     </AppShell>
   );

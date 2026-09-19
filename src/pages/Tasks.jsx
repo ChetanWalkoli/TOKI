@@ -9,21 +9,22 @@ const inputCls = 'w-full px-3 py-2 rounded-lg border border-[var(--color-line)] 
 const eyebrowCls = 'text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase';
 
 export default function Tasks({ todos, onEdit, onAdd, query, onQueryChange, settings, onClearCompleted, onStartFocus }) {
-  const [filters, setFilters] = useState({ status: 'all', priority: 'all', category: 'all', tag: 'all', sort: 'newest' });
+  const [filters, setFilters] = useState({ status: 'all', priority: 'all', category: 'all', tag: 'all', project: 'all', sort: 'newest' });
   const availableTags = getAllTags(todos.tasks);
+  const projects = todos.projects || [];
 
   const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
   const handleSelectChange = (e) => { const { name, value } = e.target; updateFilter(name, value); };
   const handleTagClick = (tag) => updateFilter('tag', tag);
 
-  const visibleTasks = sortTasks(filterTasks(todos.tasks, { ...filters, query }), filters.sort);
+  const visibleTasks = sortTasks(filterTasks(todos.tasks, { ...filters, query }, projects), filters.sort);
   const totalCount = todos.tasks.length;
   const activeCount = todos.tasks.filter((t) => !t.completed).length;
   const completedCount = todos.tasks.filter((t) => t.completed).length;
 
-  const hasActiveFilters = query.trim() !== '' || filters.status !== 'all' || filters.priority !== 'all' || filters.category !== 'all' || filters.tag !== 'all';
+  const hasActiveFilters = query.trim() !== '' || filters.status !== 'all' || filters.priority !== 'all' || filters.category !== 'all' || filters.tag !== 'all' || filters.project !== 'all';
 
-  const resetFilters = () => { onQueryChange(''); setFilters({ status: 'all', priority: 'all', category: 'all', tag: 'all', sort: 'newest' }); };
+  const resetFilters = () => { onQueryChange(''); setFilters({ status: 'all', priority: 'all', category: 'all', tag: 'all', project: 'all', sort: 'newest' }); };
 
   const tabCls = (active) => `px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
     active ? 'bg-[var(--color-coral)] text-white' : 'text-[var(--color-ink-secondary)] hover:bg-[var(--color-paper-deep)]'
@@ -48,7 +49,7 @@ export default function Tasks({ todos, onEdit, onAdd, query, onQueryChange, sett
       </div>
 
       {/* Quick Add */}
-      <QuickAddInput onAdd={todos.addTask} onOpenDetailed={onAdd} defaults={settings} placeholder="Add a task… try 'Finish design review tomorrow !high #design'" />
+      <QuickAddInput onAdd={todos.addTask} onOpenDetailed={onAdd} defaults={settings} placeholder="Add a task… try 'Finish design review tomorrow at 6pm high priority ~2h #design'" />
 
       {/* Controls panel */}
       <div className="flex flex-col gap-3 p-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper-card)] shadow-[var(--shadow-sm)]">
@@ -60,7 +61,7 @@ export default function Tasks({ todos, onEdit, onAdd, query, onQueryChange, sett
             className={`${inputCls} pl-8 pr-8`}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search by title, note, tag, or subtask…"
+            placeholder="Search by title, or try 'priority:high', 'project:portfolio', 'due:today'…"
             aria-label="Filter tasks by search term"
           />
           {query && (
@@ -89,6 +90,18 @@ export default function Tasks({ todos, onEdit, onAdd, query, onQueryChange, sett
 
         {/* Dropdown filters */}
         <div className="flex flex-wrap gap-2 items-center">
+          {/* Project filter */}
+          {projects.length > 0 && (
+            <label className="flex items-center gap-1">
+              <select name="project" value={filters.project} onChange={handleSelectChange} className={selectCls}>
+                <option value="all">All Projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
           {[
             { name: 'priority', label: 'Priority', options: priorityOptions, allLabel: 'All Priorities' },
             { name: 'category', label: 'Category', options: categories, allLabel: 'All Categories' },
@@ -128,6 +141,8 @@ export default function Tasks({ todos, onEdit, onAdd, query, onQueryChange, sett
       {/* Task list */}
       <TaskList
         tasks={visibleTasks}
+        allTasks={todos.tasks}
+        projects={projects}
         onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onTagClick={handleTagClick} onStartFocus={onStartFocus}
         emptyTitle={query ? `No tasks matching "${query}"` : hasActiveFilters ? 'No tasks match those filters' : 'No tasks yet'}
         emptySubtitle={hasActiveFilters ? 'Try adjusting your search or clearing active filters.' : 'Capture what is on your mind using the box above.'}

@@ -247,3 +247,227 @@ create index if not exists idx_achievements_user_id on public.user_achievements 
 -- Enable publication for realtime subscription
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.task_subtasks;
+
+-- =============================================================================
+-- TOKI V4 EXTENSIONS: PROJECTS, COLLABORATION, DEPENDENCIES, ATTACHMENTS & LOGS
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 9. PROJECTS TABLE
+-- -----------------------------------------------------------------------------
+create table if not exists public.projects (
+  id uuid default gen_random_uuid() primary key,
+  owner_id uuid references auth.users on delete cascade not null,
+  name text not null check (trim(name) <> ''),
+  description text default '',
+  color text default '#dc6b54',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.projects enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- 10. PROJECT MEMBERS & ROLES (COLLABORATION)
+-- -----------------------------------------------------------------------------
+create table if not exists public.project_members (
+  id uuid default gen_random_uuid() primary key,
+  project_id uuid references public.projects on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  role text default 'editor' check (role in ('owner', 'editor', 'viewer')),
+  invited_at timestamptz default now(),
+  unique (project_id, user_id)
+);
+
+alter table public.project_members enable row level security;
+
+-- Policies for projects: accessible by owner and project members
+create policy "Users can view projects they own or belong to"
+  on public.projects for select
+  using (
+    auth.uid() = owner_id or
+    exists (
+      select 1 from public.project_members
+      where project_members.project_id = projects.id
+      and project_members.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can create projects"
+  on public.projects for insert
+  with check (auth.uid() = owner_id);
+
+create policy "Owners and editors can update projects"
+  on public.projects for update
+  using (
+    auth.uid() = owner_id or
+    exists (
+      select 1 from public.project_members
+      where project_members.project_id = projects.id
+      and project_members.user_id = auth.uid()
+      and project_members.role in ('owner', 'editor')
+    )
+  );
+
+create policy "Owners can delete projects"
+  on public.projects for delete
+  using (auth.uid() = owner_id);
+
+-- Policies for project_members
+create policy "Users can view members of their projects"
+  on public.project_members for select
+  using (
+    exists (
+      select 1 from public.projects
+      where projects.id = project_members.project_id
+      and (
+        projects.owner_id = auth.uid() or
+        exists (
+          select 1 from public.project_members pm
+          where pm.project_id = projects.id
+          and pm.user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+create policy "Project owners can manage members"
+  on public.project_members for all
+  using (
+    exists (
+      select 1 from public.projects
+      where projects.id = project_members.project_id
+      and projects.owner_id = auth.uid()
+    )
+  );
+
+-- -----------------------------------------------------------------------------
+-- 11. V4 TASKS EXTENSIONS: PROJECT_ID, DUE_TIME, ESTIMATED_MINUTES
+-- -----------------------------------------------------------------------------
+alter table public.tasks add column if not exists project_id uuid references public.projects on delete set null;
+alter table public.tasks add column if not exists due_time text default '';
+alter table public.tasks add column if not exists estimated_minutes integer default 0;
+
+create index if not exists idx_tasks_project_id on public.tasks (project_id);
+
+-- -----------------------------------------------------------------------------
+-- 12. TASK DEPENDENCIES (Task B depends on Task A)
+-- -----------------------------------------------------------------------------
+create table if not exists public.task_dependencies (
+  id uuid default gen_random_uuid() primary key,
+  task_id uuid references public.tasks on delete cascade not null,
+  depends_on_task_id uuid references public.tasks on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  created_at timestamptz default now(),
+  unique (task_id, depends_on_task_id)
+);
+
+alter table public.task_dependencies enable row level security;
+
+create policy "Users can manage task dependencies"
+  on public.task_dependencies for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- -----------------------------------------------------------------------------
+-- 13. TASK COMMENTS (COLLABORATION)
+-- -----------------------------------------------------------------------------
+create table if not exists public.task_comments (
+  id uuid default gen_random_uuid() primary key,
+  task_id uuid references public.tasks on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  user_name text not null default 'Anonymous',
+  user_avatar text default '',
+  content text not null check (trim(content) <> ''),
+  created_at timestamptz default now()
+);
+
+alter table public.task_comments enable row level security;
+
+create policy "Users can view comments on accessible tasks"
+  on public.task_comments for select
+  using (
+    exists (
+      select 1 from public.tasks
+      where tasks.id = task_comments.task_id
+      and (
+        tasks.user_id = auth.uid() or
+        exists (
+          select 1 from public.project_members
+          where project_members.project_id = tasks.project_id
+          and project_members.user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+create policy "Users can post comments"
+  on public.task_comments for insert
+  with check (auth.uid() = user_id);
+
+-- -----------------------------------------------------------------------------
+-- 14. TASK ATTACHMENTS
+-- -----------------------------------------------------------------------------
+create table if not exists public.task_attachments (
+  id uuid default gen_random_uuid() primary key,
+  task_id uuid references public.tasks on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  size integer not null default 0,
+  type text not null default 'application/octet-stream',
+  storage_path text not null,
+  url text default '',
+  created_at timestamptz default now()
+);
+
+alter table public.task_attachments enable row level security;
+
+create policy "Users can view own attachments"
+  on public.task_attachments for select
+  using (auth.uid() = user_id);
+
+create policy "Users can manage own attachments"
+  on public.task_attachments for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- -----------------------------------------------------------------------------
+-- 15. ACTIVITY LOG TABLE
+-- -----------------------------------------------------------------------------
+create table if not exists public.activity_log (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  project_id uuid references public.projects on delete set null,
+  task_id uuid references public.tasks on delete set null,
+  user_name text default 'Anonymous',
+  action text not null,
+  entity_type text not null default 'task',
+  entity_title text not null default '',
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+alter table public.activity_log enable row level security;
+
+create policy "Users can view relevant activity logs"
+  on public.activity_log for select
+  using (
+    auth.uid() = user_id or
+    (project_id is not null and exists (
+      select 1 from public.project_members
+      where project_members.project_id = activity_log.project_id
+      and project_members.user_id = auth.uid()
+    ))
+  );
+
+create policy "Users can insert activity logs"
+  on public.activity_log for insert
+  with check (auth.uid() = user_id);
+
+create index if not exists idx_activity_user on public.activity_log (user_id, created_at desc);
+create index if not exists idx_activity_project on public.activity_log (project_id, created_at desc);
+
+-- Realtime publication additions for V4
+alter publication supabase_realtime add table public.projects;
+alter publication supabase_realtime add table public.task_comments;
+alter publication supabase_realtime add table public.activity_log;

@@ -1,0 +1,21 @@
+{
+  "name": "Toki — Productivity Companion",
+  "short_name": "Toki",
+  "description": "Make progress feel good. An intelligent, human productivity application.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbfaf7",
+  "theme_color": "#dc6b54",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1,16 +1,39 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, Flame } from 'lucide-react';
+import { ArrowRight, Sparkles, Flame, FolderGit2, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Companion from '../components/companion/Companion';
 import TaskList from '../components/tasks/TaskList';
 import QuickAddInput from '../components/tasks/QuickAddInput';
+import ActivityFeed from '../components/common/ActivityFeed';
+import ProductivityInsights from '../components/analytics/ProductivityInsights';
 import { getGreeting, getTodayString, isOverdue } from '../utils/task';
 import { getSmartMicrocopy } from '../utils/smartMicrocopy';
 
 const eyebrowCls = 'text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase';
 
-export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus }) {
-  const { tasks, todayStats, stats, streak, lastAction, toggleTask, deleteTask, addTask, toggleSubtask, addSubtask, setTaskStatus } = todos;
+export default function Dashboard({
+  todos,
+  onAdd,
+  onEdit,
+  settings,
+  onStartFocus,
+  onOpenPlanMyDay,
+}) {
+  const {
+    tasks,
+    projects = [],
+    activityLog = [],
+    todayStats,
+    stats,
+    streak,
+    lastAction,
+    toggleTask,
+    deleteTask,
+    addTask,
+    toggleSubtask,
+    addSubtask,
+    setTaskStatus,
+  } = todos;
   const greeting = getGreeting();
   const todayStr = getTodayString();
   const smartCopy = getSmartMicrocopy({ tasks, lastAction, todayStats, streak });
@@ -57,10 +80,22 @@ export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus
         </div>
       </section>
 
-      {/* Progress bar */}
+      {/* Progress bar with Plan My Day button */}
       <section className="flex flex-col sm:flex-row gap-4 p-5 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper-card)] shadow-[var(--shadow-sm)]" aria-label="Today productivity summary">
         <div className="flex-1 flex flex-col gap-1">
-          <p className={eyebrowCls}>Today's Metrics</p>
+          <div className="flex items-center justify-between">
+            <p className={eyebrowCls}>Today's Metrics</p>
+            {onOpenPlanMyDay && (
+              <button
+                type="button"
+                onClick={onOpenPlanMyDay}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--color-coral-subtle)] text-[var(--color-coral)] text-xs font-semibold hover:bg-[#f8dfd8] transition-colors"
+              >
+                <Sparkles size={12} />
+                <span>Plan my day</span>
+              </button>
+            )}
+          </div>
           <p className="text-sm font-semibold text-[var(--color-ink)]">
             <strong>{todayStats.completed}</strong> completed · <strong>{todayStats.remaining}</strong> remaining
           </p>
@@ -90,7 +125,7 @@ export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus
           onOpenDetailed={onAdd}
           defaults={settings}
           defaultDueDate={todayStr}
-          placeholder="Add a task for today… try 'Finish deck tomorrow !high #work'"
+          placeholder="Add a task for today… try 'Finish deck tomorrow at 6pm high priority ~2h'"
         />
       </section>
 
@@ -104,7 +139,20 @@ export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus
             </div>
             <span className="text-[11px] px-2.5 py-1 rounded-full bg-[var(--color-coral-subtle)] text-[var(--color-coral)] font-semibold">{priorityTasks.length} active</span>
           </div>
-          <TaskList tasks={priorityTasks} onToggle={toggleTask} onEdit={onEdit} onDelete={deleteTask} onToggleSubtask={toggleSubtask} onAddSubtask={addSubtask} onSetStatus={setTaskStatus} onStartFocus={onStartFocus} emptyTitle="No priority items left" emptySubtitle="You're caught up on urgent tasks." />
+          <TaskList
+            tasks={priorityTasks}
+            allTasks={tasks}
+            projects={projects}
+            onToggle={toggleTask}
+            onEdit={onEdit}
+            onDelete={deleteTask}
+            onToggleSubtask={toggleSubtask}
+            onAddSubtask={addSubtask}
+            onSetStatus={setTaskStatus}
+            onStartFocus={onStartFocus}
+            emptyTitle="No priority items left"
+            emptySubtitle="You're caught up on urgent tasks."
+          />
         </section>
       )}
 
@@ -120,7 +168,30 @@ export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus
             <Sparkles size={13} /> Add with details
           </button>
         </div>
-        <TaskList tasks={todayTasks} onToggle={toggleTask} onEdit={onEdit} onDelete={deleteTask} onToggleSubtask={toggleSubtask} onAddSubtask={addSubtask} onSetStatus={setTaskStatus} onStartFocus={onStartFocus} emptyTitle="Nothing on the list for today" emptySubtitle="Type a task above to quickly get started." />
+        <TaskList
+          tasks={todayTasks}
+          allTasks={tasks}
+          projects={projects}
+          onToggle={toggleTask}
+          onEdit={onEdit}
+          onDelete={deleteTask}
+          onToggleSubtask={toggleSubtask}
+          onAddSubtask={addSubtask}
+          onSetStatus={setTaskStatus}
+          onStartFocus={onStartFocus}
+          emptyTitle="Nothing on the list for today"
+          emptySubtitle="Type a task above to quickly get started."
+        />
+      </section>
+
+      {/* Productivity Insights (Real User Data Only) */}
+      <section aria-label="Productivity insights">
+        <ProductivityInsights tasks={tasks} />
+      </section>
+
+      {/* Recent Activity Log */}
+      <section aria-label="Recent activity log">
+        <ActivityFeed activities={activityLog} />
       </section>
 
       {/* Upcoming preview */}
@@ -135,7 +206,18 @@ export default function Dashboard({ todos, onAdd, onEdit, settings, onStartFocus
               See all <ArrowRight size={13} />
             </Link>
           </div>
-          <TaskList tasks={upcomingTasks} onToggle={toggleTask} onEdit={onEdit} onDelete={deleteTask} onToggleSubtask={toggleSubtask} onAddSubtask={addSubtask} onSetStatus={setTaskStatus} onStartFocus={onStartFocus} />
+          <TaskList
+            tasks={upcomingTasks}
+            allTasks={tasks}
+            projects={projects}
+            onToggle={toggleTask}
+            onEdit={onEdit}
+            onDelete={deleteTask}
+            onToggleSubtask={toggleSubtask}
+            onAddSubtask={addSubtask}
+            onSetStatus={setTaskStatus}
+            onStartFocus={onStartFocus}
+          />
         </section>
       )}
     </motion.div>

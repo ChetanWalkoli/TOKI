@@ -101,17 +101,33 @@ export function getAllTags(tasks = []) {
  * Extracts due date, priority, tags from string like:
  * "Finish React project tomorrow !high #frontend"
  */
+/**
+ * Natural language task parser
+ * Extracts title, due date, time, priority, estimated duration, project, and tags from strings like:
+ * "Finish portfolio tomorrow at 6pm high priority ~2h #design p:portfolio"
+ */
 export function parseTaskInput(text) {
   if (!text || typeof text !== 'string') {
-    return { title: '', dueDate: getTodayString(), priority: 'Medium', tags: [] };
+    return {
+      title: '',
+      dueDate: getTodayString(),
+      dueTime: '',
+      priority: 'Medium',
+      estimatedMinutes: 0,
+      projectId: null,
+      tags: [],
+    };
   }
 
   let working = text.trim();
   let dueDate = getTodayString();
+  let dueTime = '';
   let priority = 'Medium';
+  let estimatedMinutes = 0;
+  let projectId = null;
   const tags = [];
 
-  // Extract tags: #tagname
+  // 1. Extract tags: #tagname
   const tagMatches = working.match(/#[a-zA-Z0-9_\-]+/g);
   if (tagMatches) {
     tagMatches.forEach((tag) => {
@@ -120,18 +136,88 @@ export function parseTaskInput(text) {
     });
   }
 
-  // Extract priority markers: !high, !urgent, !med, !medium, !low
-  const prioRegex = /!(high|urgent|med|medium|low)\b/i;
-  const prioMatch = working.match(prioRegex);
-  if (prioMatch) {
-    const rawPrio = prioMatch[1].toLowerCase();
-    if (rawPrio === 'high' || rawPrio === 'urgent') priority = 'High';
-    else if (rawPrio === 'low') priority = 'Low';
-    else priority = 'Medium';
-    working = working.replace(prioMatch[0], '');
+  // 2. Extract project: p:project-name or project:project-name
+  const projMatch = working.match(/\b(?:p|project):([a-zA-Z0-9_\-]+)\b/i);
+  if (projMatch) {
+    projectId = projMatch[1].toLowerCase();
+    working = working.replace(projMatch[0], '');
   }
 
-  // Extract dates: today, tomorrow, yesterday, next week, in X days
+  // 3. Extract estimated duration: ~30m, ~1h, ~2h, ~45m, for 30m, for 1 hour, for 45 mins, 30m, 1h
+  const estMatch = working.match(/(?:~|for\s+|estimate\s+)?(\d+(?:\.\d+)?)\s*(m|min|mins|minutes|h|hr|hrs|hours)\b/i);
+  if (estMatch) {
+    const num = parseFloat(estMatch[1]);
+    const unit = estMatch[2].toLowerCase();
+    if (unit.startsWith('h')) {
+      estimatedMinutes = Math.round(num * 60);
+    } else {
+      estimatedMinutes = Math.round(num);
+    }
+    working = working.replace(estMatch[0], '');
+  }
+
+  // 4. Extract time: "at 6pm", "at 6:30pm", "at 18:00", "at 9am", "at noon", "at midnight", "6pm", "18:00"
+  const timeRegex = /\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5][0-9]))?\s*(am|pm)\b/i;
+  const timeMatch = working.match(timeRegex);
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = timeMatch[2] ? timeMatch[2] : '00';
+    const ampm = timeMatch[3].toLowerCase();
+
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+
+    dueTime = `${String(hour).padStart(2, '0')}:${minute}`;
+    working = working.replace(timeMatch[0], '');
+  } else {
+    // Check 24-hour time: "at 18:00", "14:30"
+    const time24Match = working.match(/\b(?:at\s+)?([01]?[0-9]|2[0-3]):([0-5][0-9])\b/i);
+    if (time24Match) {
+      dueTime = `${String(time24Match[1]).padStart(2, '0')}:${time24Match[2]}`;
+      working = working.replace(time24Match[0], '');
+    } else if (/\bat noon\b/i.test(working)) {
+      dueTime = '12:00';
+      working = working.replace(/\bat noon\b/i, '');
+    } else if (/\bat midnight\b/i.test(working)) {
+      dueTime = '00:00';
+      working = working.replace(/\bat midnight\b/i, '');
+    }
+  }
+
+  // 5. Extract priority markers:
+  // "high priority", "urgent priority", "medium priority", "low priority",
+  // "!high", "!urgent", "!med", "!medium", "!low", "priority high"
+  const wordPrioRegex = /\b(high|urgent|medium|med|low)\s+priority\b/i;
+  const wordPrioMatch = working.match(wordPrioRegex);
+  if (wordPrioMatch) {
+    const raw = wordPrioMatch[1].toLowerCase();
+    if (raw === 'high' || raw === 'urgent') priority = 'High';
+    else if (raw === 'low') priority = 'Low';
+    else priority = 'Medium';
+    working = working.replace(wordPrioMatch[0], '');
+  } else {
+    const prioSymbolRegex = /!(high|urgent|med|medium|low)\b/i;
+    const prioSymbolMatch = working.match(prioSymbolRegex);
+    if (prioSymbolMatch) {
+      const raw = prioSymbolMatch[1].toLowerCase();
+      if (raw === 'high' || raw === 'urgent') priority = 'High';
+      else if (raw === 'low') priority = 'Low';
+      else priority = 'Medium';
+      working = working.replace(prioSymbolMatch[0], '');
+    } else {
+      const prioWordRegex = /\bpriority\s*:\s*(high|urgent|med|medium|low)\b/i;
+      const prioWordMatch = working.match(prioWordRegex);
+      if (prioWordMatch) {
+        const raw = prioWordMatch[1].toLowerCase();
+        if (raw === 'high' || raw === 'urgent') priority = 'High';
+        else if (raw === 'low') priority = 'Low';
+        else priority = 'Medium';
+        working = working.replace(prioWordMatch[0], '');
+      }
+    }
+  }
+
+  // 6. Extract dates: today, tomorrow, yesterday, next week, in X days
   const now = new Date();
   if (/\b(today)\b/i.test(working)) {
     dueDate = getTodayString();
@@ -158,13 +244,16 @@ export function parseTaskInput(text) {
     }
   }
 
-  // Clean title
+  // 7. Clean up title (remove leftover artifacts like extra spaces)
   const cleanTitle = working.replace(/\s+/g, ' ').trim();
 
   return {
     title: cleanTitle || text.trim(),
     dueDate,
+    dueTime,
     priority,
+    estimatedMinutes,
+    projectId,
     tags: [...new Set(tags)],
   };
 }
@@ -261,29 +350,109 @@ export function smartSortTasks(tasks = []) {
   });
 }
 
+/**
+ * Advanced search parser and task filter
+ * Supports queries like:
+ * - "high priority tasks" or "priority:high"
+ * - "overdue tasks" or "is:overdue"
+ * - "tasks due today" or "due:today"
+ * - "project:portfolio" or "p:portfolio"
+ * - "tag:frontend"
+ * - "status:done" / "status:todo" / "status:in_progress"
+ */
 export function filterTasks(
   tasks = [],
-  { query = '', status = 'all', priority = 'all', category = 'all', tag = 'all' }
+  { query = '', status = 'all', priority = 'all', category = 'all', tag = 'all', project = 'all' },
+  projects = []
 ) {
-  const term = query.trim().toLowerCase();
+  let workingQuery = query.trim().toLowerCase();
+  let filterPriority = priority;
+  let filterStatus = status;
+  let filterTag = tag;
+  let filterProject = project;
+  let filterDue = null;
+  let filterOverdue = false;
+
+  // Natural language query shortcuts
+  if (/\bhigh priority\b/i.test(workingQuery)) {
+    filterPriority = 'High';
+    workingQuery = workingQuery.replace(/\bhigh priority\b/i, '');
+  } else if (/\blow priority\b/i.test(workingQuery)) {
+    filterPriority = 'Low';
+    workingQuery = workingQuery.replace(/\blow priority\b/i, '');
+  } else if (/\bmedium priority\b/i.test(workingQuery)) {
+    filterPriority = 'Medium';
+    workingQuery = workingQuery.replace(/\bmedium priority\b/i, '');
+  }
+
+  if (/\b(overdue tasks|is:overdue|overdue:true|\boverdue\b)/i.test(workingQuery)) {
+    filterOverdue = true;
+    workingQuery = workingQuery.replace(/\b(overdue tasks|is:overdue|overdue:true|\boverdue\b)/i, '');
+  }
+
+  if (/\b(tasks due today|due:today|due today)\b/i.test(workingQuery)) {
+    filterDue = 'today';
+    workingQuery = workingQuery.replace(/\b(tasks due today|due:today|due today)\b/i, '');
+  } else if (/\b(tasks due tomorrow|due:tomorrow|due tomorrow)\b/i.test(workingQuery)) {
+    filterDue = 'tomorrow';
+    workingQuery = workingQuery.replace(/\b(tasks due tomorrow|due:tomorrow|due tomorrow)\b/i, '');
+  }
+
+  // Syntax filters: priority:high, prio:high
+  const prioMatch = workingQuery.match(/\b(?:priority|prio):(high|medium|low)\b/i);
+  if (prioMatch) {
+    const raw = prioMatch[1].toLowerCase();
+    filterPriority = raw.charAt(0).toUpperCase() + raw.slice(1);
+    workingQuery = workingQuery.replace(prioMatch[0], '');
+  }
+
+  // Syntax filters: status:done, status:todo, status:in_progress
+  const statusMatch = workingQuery.match(/\bstatus:(done|completed|todo|in_progress|active)\b/i);
+  if (statusMatch) {
+    const raw = statusMatch[1].toLowerCase();
+    filterStatus = raw === 'completed' ? 'done' : raw;
+    workingQuery = workingQuery.replace(statusMatch[0], '');
+  }
+
+  // Syntax filters: tag:frontend, #frontend
+  const tagMatch = workingQuery.match(/\b(?:tag:|#)([a-zA-Z0-9_\-]+)\b/i);
+  if (tagMatch) {
+    filterTag = tagMatch[1].toLowerCase();
+    workingQuery = workingQuery.replace(tagMatch[0], '');
+  }
+
+  // Syntax filters: project:xyz, p:xyz
+  const projMatch = workingQuery.match(/\b(?:project|p):([a-zA-Z0-9_\-]+)\b/i);
+  if (projMatch) {
+    filterProject = projMatch[1].toLowerCase();
+    workingQuery = workingQuery.replace(projMatch[0], '');
+  }
+
+  // Clean remaining text
+  const cleanTerm = workingQuery.replace(/\btasks\b/g, '').replace(/\s+/g, ' ').trim();
+
+  const todayStr = getTodayString();
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
   return tasks.filter((task) => {
-    // Search query matches title, description, category, or tags
-    if (term) {
-      const matchTitle = task.title?.toLowerCase().includes(term);
-      const matchDesc = task.description?.toLowerCase().includes(term);
-      const matchCategory = task.category?.toLowerCase().includes(term);
-      const matchTags = Array.isArray(task.tags) && task.tags.some((t) => t.toLowerCase().includes(term));
-      const matchSubtasks = Array.isArray(task.subtasks) && task.subtasks.some((st) => st.title.toLowerCase().includes(term));
-      if (!matchTitle && !matchDesc && !matchCategory && !matchTags && !matchSubtasks) return false;
+    // Overdue filter
+    if (filterOverdue) {
+      if (!isOverdue(task)) return false;
     }
 
+    // Due date filter
+    if (filterDue === 'today' && task.dueDate !== todayStr) return false;
+    if (filterDue === 'tomorrow' && task.dueDate !== tomorrowStr) return false;
+
     // Status filter
-    if (status === 'active' && task.completed) return false;
-    if (status === 'completed' && !task.completed) return false;
+    if (filterStatus === 'active' && task.completed) return false;
+    if (filterStatus === 'completed' && !task.completed) return false;
+    if (filterStatus === 'done' && !task.completed) return false;
+    if (filterStatus === 'todo' && (task.completed || task.status === 'in_progress')) return false;
+    if (filterStatus === 'in_progress' && (task.completed || task.status !== 'in_progress')) return false;
 
     // Priority filter
-    if (priority !== 'all' && task.priority?.toLowerCase() !== priority.toLowerCase()) {
+    if (filterPriority !== 'all' && task.priority?.toLowerCase() !== filterPriority.toLowerCase()) {
       return false;
     }
 
@@ -293,10 +462,31 @@ export function filterTasks(
     }
 
     // Tag filter
-    if (tag !== 'all') {
-      if (!Array.isArray(task.tags) || !task.tags.includes(tag.toLowerCase())) {
+    if (filterTag !== 'all') {
+      if (!Array.isArray(task.tags) || !task.tags.map((t) => t.toLowerCase()).includes(filterTag.toLowerCase())) {
         return false;
       }
+    }
+
+    // Project filter
+    if (filterProject !== 'all') {
+      const matchProjectId = task.projectId?.toLowerCase() === filterProject.toLowerCase();
+      // Also match project name if projects array is provided
+      const matchedProjectObj = projects.find(
+        (p) => p.id?.toLowerCase() === task.projectId?.toLowerCase() ||
+               p.name?.toLowerCase().includes(filterProject.toLowerCase())
+      );
+      if (!matchProjectId && !matchedProjectObj) return false;
+    }
+
+    // Free text match
+    if (cleanTerm) {
+      const matchTitle = task.title?.toLowerCase().includes(cleanTerm);
+      const matchDesc = task.description?.toLowerCase().includes(cleanTerm);
+      const matchCategory = task.category?.toLowerCase().includes(cleanTerm);
+      const matchTags = Array.isArray(task.tags) && task.tags.some((t) => t.toLowerCase().includes(cleanTerm));
+      const matchSubtasks = Array.isArray(task.subtasks) && task.subtasks.some((st) => st.title.toLowerCase().includes(cleanTerm));
+      if (!matchTitle && !matchDesc && !matchCategory && !matchTags && !matchSubtasks) return false;
     }
 
     return true;

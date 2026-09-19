@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { initialTasks } from '../data/seed';
-import { readStore, writeStore, sanitizeTask, clearStore } from '../services/storage';
+import { initialTasks, initialProjects } from '../data/seed';
+import {
+  readStore,
+  writeStore,
+  sanitizeTask,
+  clearStore,
+  readProjects,
+  writeProjects,
+  sanitizeProject,
+  readActivityLog,
+  logActivityItem,
+  readOfflineQueue,
+  pushOfflineQueue,
+  clearOfflineQueue,
+  detectTaskConflict,
+} from '../services/storage';
 import {
   fetchTasks,
   createCloudTask,
@@ -25,6 +39,19 @@ export function useTodos(user = null, isConfigured = false) {
     }
     return initialTasks.map(sanitizeTask).filter(Boolean);
   });
+
+  // Projects state
+  const [projects, setProjects] = useState(() => {
+    return readProjects(initialProjects);
+  });
+
+  // Activity Log state
+  const [activityLog, setActivityLog] = useState(() => {
+    return readActivityLog(50);
+  });
+
+  // Conflict Resolution state
+  const [pendingConflict, setPendingConflict] = useState(null);
 
   const [loading, setLoading] = useState(Boolean(user));
   const [error, setError] = useState(null);
@@ -52,6 +79,20 @@ export function useTodos(user = null, isConfigured = false) {
     setError(null);
     try {
       const cloudTasks = await fetchTasks(user.id);
+
+      // Check for conflicts against local modified tasks
+      const localStore = readStore({ tasks: [] }).tasks || [];
+      for (const ct of cloudTasks) {
+        const localMatch = localStore.find((lt) => lt.id === ct.id);
+        if (localMatch) {
+          const conflict = detectTaskConflict(localMatch, ct);
+          if (conflict && conflict.hasConflict) {
+            setPendingConflict(conflict);
+            break;
+          }
+        }
+      }
+
       setTasks(cloudTasks);
     } catch (err) {
       console.error('Toki: Cloud task load failed:', err);
@@ -72,7 +113,6 @@ export function useTodos(user = null, isConfigured = false) {
     if (!user || !isConfigured) return;
 
     const sub = subscribeToTaskChanges(user.id, () => {
-      // Reload on remote changes
       loadCloudTasks();
     });
 
@@ -81,13 +121,18 @@ export function useTodos(user = null, isConfigured = false) {
     };
   }, [user, isConfigured, loadCloudTasks]);
 
-  // Local storage persistence when not logged in
+  // Local storage persistence for tasks
   useEffect(() => {
     if (!user) {
       const currentStore = readStore({});
       writeStore({ ...currentStore, tasks });
     }
   }, [tasks, user]);
+
+  // Local storage persistence for projects
+  useEffect(() => {
+    writeProjects(projects);
+  }, [projects]);
 
   // Migrate local tasks into Supabase
   const migrateLocalToCloud = async () => {
@@ -98,7 +143,6 @@ export function useTodos(user = null, isConfigured = false) {
     setLoading(true);
     try {
       const importedCount = await migrateLocalTasks(localTasks, user.id);
-      // Clear local store after successful migration so they aren't duplicate imported
       clearStore();
       setHasLocalTasksToMigrate(false);
       await loadCloudTasks();
@@ -116,7 +160,7 @@ export function useTodos(user = null, isConfigured = false) {
   };
 
   // ---------------------------------------------------------------------------
-  // CRUD OPERATIONS WITH OPTIMISTIC UPDATES
+  // TASK CRUD WITH OPTIMISTIC UPDATES & ACTIVITY LOGGING
   // ---------------------------------------------------------------------------
 
   const addTask = async (taskData) => {
@@ -129,7 +173,10 @@ export function useTodos(user = null, isConfigured = false) {
         ...initialProps,
         title: parsed.title,
         dueDate: parsed.dueDate,
+        dueTime: parsed.dueTime,
         priority: parsed.priority,
+        estimatedMinutes: parsed.estimatedMinutes,
+        projectId: parsed.projectId,
         tags: parsed.tags.length > 0 ? parsed.tags : initialProps.tags || [],
       };
     }
@@ -143,6 +190,12 @@ export function useTodos(user = null, isConfigured = false) {
       category: initialProps.category || 'Personal',
       status: initialProps.status || 'todo',
       dueDate: initialProps.dueDate || new Date().toISOString().slice(0, 10),
+      dueTime: initialProps.dueTime || '',
+      estimatedMinutes: initialProps.estimatedMinutes || 0,
+      projectId: initialProps.projectId || null,
+      dependsOn: initialProps.dependsOn || [],
+      attachments: initialProps.attachments || [],
+      comments: initialProps.comments || [],
       subtasks: initialProps.subtasks || [],
       tags: initialProps.tags || [],
       focusSessions: 0,
@@ -153,10 +206,18 @@ export function useTodos(user = null, isConfigured = false) {
       completedAt: null,
     });
 
-    // Optimistic state update
     prevTasksRef.current = tasks;
     setTasks((prev) => [optimisticTask, ...prev]);
     setLastAction('created');
+
+    // Meaningful activity logging
+    const logged = logActivityItem({
+      action: 'created',
+      entityType: 'task',
+      entityTitle: optimisticTask.title,
+      userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'You',
+    });
+    if (logged) setActivityLog((prev) => [logged, ...prev]);
 
     if (user && isConfigured) {
       try {
@@ -167,9 +228,8 @@ export function useTodos(user = null, isConfigured = false) {
           );
         }
       } catch (err) {
-        console.error('Toki: Failed to save task to cloud, rolling back:', err);
-        setTasks(prevTasksRef.current);
-        setError('Failed to create task on the cloud.');
+        console.error('Toki: Failed to save task to cloud, queueing offline:', err);
+        pushOfflineQueue({ type: 'create', task: optimisticTask });
       }
     }
 
@@ -194,37 +254,48 @@ export function useTodos(user = null, isConfigured = false) {
       try {
         await updateCloudTask(id, changes);
       } catch (err) {
-        console.error('Toki: Failed to update cloud task, rolling back:', err);
-        setTasks(prevTasksRef.current);
-        setError('Failed to save changes to cloud.');
+        console.error('Toki: Failed to update cloud task, queueing offline:', err);
+        pushOfflineQueue({ type: 'update', id, changes });
       }
     }
   };
 
   const deleteTask = async (id) => {
+    const taskToDelete = tasks.find((t) => t.id === id);
     prevTasksRef.current = tasks;
     setTasks((prev) => prev.filter((task) => task.id !== id));
     setLastAction('deleted');
+
+    if (taskToDelete) {
+      const logged = logActivityItem({
+        action: 'deleted',
+        entityType: 'task',
+        entityTitle: taskToDelete.title,
+        userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'You',
+      });
+      if (logged) setActivityLog((prev) => [logged, ...prev]);
+    }
 
     if (user && isConfigured) {
       try {
         await deleteCloudTask(id);
       } catch (err) {
-        console.error('Toki: Failed to delete cloud task, rolling back:', err);
-        setTasks(prevTasksRef.current);
-        setError('Failed to delete task from cloud.');
+        console.error('Toki: Failed to delete cloud task, queueing offline:', err);
+        pushOfflineQueue({ type: 'delete', id });
       }
     }
   };
 
   const toggleTask = async (id) => {
     let nextStatus = false;
+    let toggledTaskTitle = '';
     prevTasksRef.current = tasks;
 
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== id) return task;
         nextStatus = !task.completed;
+        toggledTaskTitle = task.title;
         const now = Date.now();
         return sanitizeTask({
           ...task,
@@ -237,24 +308,35 @@ export function useTodos(user = null, isConfigured = false) {
     );
     setLastAction(nextStatus ? 'completed' : 'reopened');
 
+    if (toggledTaskTitle) {
+      const logged = logActivityItem({
+        action: nextStatus ? 'completed' : 'reopened',
+        entityType: 'task',
+        entityTitle: toggledTaskTitle,
+        userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'You',
+      });
+      if (logged) setActivityLog((prev) => [logged, ...prev]);
+    }
+
     if (user && isConfigured) {
       try {
         await toggleCloudTask(id, nextStatus);
       } catch (err) {
-        console.error('Toki: Failed to toggle cloud task, rolling back:', err);
-        setTasks(prevTasksRef.current);
-        setError('Failed to update task completion on cloud.');
+        console.error('Toki: Failed to toggle cloud task, queueing offline:', err);
+        pushOfflineQueue({ type: 'toggle', id, completed: nextStatus });
       }
     }
   };
 
   const setTaskStatus = async (id, newStatus) => {
     const isDone = newStatus === 'done';
+    let targetTitle = '';
     prevTasksRef.current = tasks;
 
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== id) return task;
+        targetTitle = task.title;
         const now = Date.now();
         return sanitizeTask({
           ...task,
@@ -265,69 +347,67 @@ export function useTodos(user = null, isConfigured = false) {
         });
       })
     );
-    setLastAction(isDone ? 'completed' : 'edited');
+    setLastAction(`moved_to_${newStatus}`);
+
+    if (targetTitle) {
+      const logged = logActivityItem({
+        action: `moved to ${newStatus.replace('_', ' ')}`,
+        entityType: 'task',
+        entityTitle: targetTitle,
+        userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'You',
+      });
+      if (logged) setActivityLog((prev) => [logged, ...prev]);
+    }
 
     if (user && isConfigured) {
       try {
-        await setCloudStatusApi(id, newStatus);
+        await setCloudStatusApi(id, newStatus, isDone);
       } catch (err) {
-        console.error('Toki: Failed to update status on cloud, rolling back:', err);
-        setTasks(prevTasksRef.current);
-        setError('Failed to update task status on cloud.');
+        console.error('Toki: Failed to update status on cloud, queueing offline:', err);
+        pushOfflineQueue({ type: 'setStatus', id, status: newStatus, completed: isDone });
       }
     }
   };
 
-  // Subtasks
   const addSubtask = async (taskId, title) => {
-    if (!title || !title.trim()) return;
-    const tempId = crypto.randomUUID();
-    prevTasksRef.current = tasks;
+    const cleanTitle = typeof title === 'string' ? title.trim() : '';
+    if (!cleanTitle) return;
+
+    const newSubtask = {
+      id: crypto.randomUUID(),
+      title: cleanTitle,
+      completed: false,
+    };
 
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
-        const subtasks = [
-          ...(task.subtasks || []),
-          { id: tempId, title: title.trim(), completed: false },
-        ];
-        return sanitizeTask({ ...task, subtasks, updatedAt: Date.now() });
+        return sanitizeTask({
+          ...task,
+          subtasks: [...(task.subtasks || []), newSubtask],
+          updatedAt: Date.now(),
+        });
       })
     );
 
     if (user && isConfigured) {
       try {
-        const cloudSubtask = await addCloudSubtask(taskId, user.id, title.trim());
-        if (cloudSubtask) {
-          setTasks((prev) =>
-            prev.map((task) => {
-              if (task.id !== taskId) return task;
-              const subtasks = (task.subtasks || []).map((st) =>
-                st.id === tempId ? { ...st, id: cloudSubtask.id } : st
-              );
-              return { ...task, subtasks };
-            })
-          );
-        }
+        await addCloudSubtask(taskId, newSubtask, user.id);
       } catch (err) {
-        console.error('Toki: Failed to add subtask to cloud:', err);
+        console.warn('Toki: Failed to add subtask to cloud:', err);
       }
     }
   };
 
   const toggleSubtask = async (taskId, subtaskId) => {
-    let nextCompleted = false;
-    prevTasksRef.current = tasks;
-
+    let nextStatus = false;
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
         const subtasks = (task.subtasks || []).map((st) => {
-          if (st.id === subtaskId) {
-            nextCompleted = !st.completed;
-            return { ...st, completed: nextCompleted };
-          }
-          return st;
+          if (st.id !== subtaskId) return st;
+          nextStatus = !st.completed;
+          return { ...st, completed: nextStatus };
         });
         return sanitizeTask({ ...task, subtasks, updatedAt: Date.now() });
       })
@@ -335,15 +415,14 @@ export function useTodos(user = null, isConfigured = false) {
 
     if (user && isConfigured) {
       try {
-        await toggleCloudSubtask(subtaskId, nextCompleted);
+        await toggleCloudSubtask(subtaskId, nextStatus);
       } catch (err) {
-        console.error('Toki: Failed to toggle subtask on cloud:', err);
+        console.warn('Toki: Failed to toggle subtask on cloud:', err);
       }
     }
   };
 
   const deleteSubtask = async (taskId, subtaskId) => {
-    prevTasksRef.current = tasks;
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
@@ -356,20 +435,24 @@ export function useTodos(user = null, isConfigured = false) {
       try {
         await deleteCloudSubtask(subtaskId);
       } catch (err) {
-        console.error('Toki: Failed to delete subtask on cloud:', err);
+        console.warn('Toki: Failed to delete subtask from cloud:', err);
       }
     }
   };
 
-  // Tags
   const addTag = (taskId, tag) => {
-    const cleanTag = tag.trim().replace(/^#/, '').toLowerCase();
-    if (!cleanTag) return;
+    const clean = tag.trim().replace(/^#/, '').toLowerCase();
+    if (!clean) return;
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
-        const tags = [...new Set([...(task.tags || []), cleanTag])];
-        return sanitizeTask({ ...task, tags, updatedAt: Date.now() });
+        const existingTags = task.tags || [];
+        if (existingTags.includes(clean)) return task;
+        return sanitizeTask({
+          ...task,
+          tags: [...existingTags, clean],
+          updatedAt: Date.now(),
+        });
       })
     );
   };
@@ -378,20 +461,24 @@ export function useTodos(user = null, isConfigured = false) {
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
-        const tags = (task.tags || []).filter((t) => t !== tagToRemove);
-        return sanitizeTask({ ...task, tags, updatedAt: Date.now() });
+        return sanitizeTask({
+          ...task,
+          tags: (task.tags || []).filter((t) => t !== tagToRemove),
+          updatedAt: Date.now(),
+        });
       })
     );
   };
 
-  const logFocusSession = async (taskId, durationMinutes = 25) => {
+  const logFocusSession = (taskId, minutes) => {
+    if (!taskId || !minutes) return;
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
         return sanitizeTask({
           ...task,
           focusSessions: (task.focusSessions || 0) + 1,
-          focusMinutes: (task.focusMinutes || 0) + durationMinutes,
+          focusMinutes: (task.focusMinutes || 0) + minutes,
           updatedAt: Date.now(),
         });
       })
@@ -414,7 +501,71 @@ export function useTodos(user = null, isConfigured = false) {
     }
   };
 
-  // Overall metrics
+  // ---------------------------------------------------------------------------
+  // V4: PROJECT MANAGEMENT
+  // ---------------------------------------------------------------------------
+  const createProject = (projectData) => {
+    const sanitized = sanitizeProject({
+      ...projectData,
+      id: crypto.randomUUID(),
+      ownerId: user?.id || 'local-user',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    setProjects((prev) => [sanitized, ...prev]);
+
+    const logged = logActivityItem({
+      action: 'created',
+      entityType: 'project',
+      entityTitle: sanitized.name,
+      userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'You',
+    });
+    if (logged) setActivityLog((prev) => [logged, ...prev]);
+
+    return sanitized;
+  };
+
+  const updateProject = (projectId, changes) => {
+    setProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== projectId) return p;
+        return sanitizeProject({
+          ...p,
+          ...changes,
+          updatedAt: Date.now(),
+        });
+      })
+    );
+  };
+
+  const deleteProject = (projectId) => {
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    // Disassociate tasks from deleted project
+    setTasks((prev) =>
+      prev.map((t) => (t.projectId === projectId ? { ...t, projectId: null } : t))
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // V4: CONFLICT RESOLUTION
+  // ---------------------------------------------------------------------------
+  const resolveConflict = async (mergedTask) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === mergedTask.id ? mergedTask : t))
+    );
+    setPendingConflict(null);
+
+    if (user && isConfigured) {
+      try {
+        await updateCloudTask(mergedTask.id, mergedTask);
+      } catch (err) {
+        console.warn('Toki: Failed to persist conflict resolution to cloud:', err);
+      }
+    }
+  };
+
+  // Metrics
   const stats = useMemo(() => {
     const total = tasks.length;
     const complete = tasks.filter((t) => t.completed).length;
@@ -433,6 +584,8 @@ export function useTodos(user = null, isConfigured = false) {
 
   return {
     tasks,
+    projects,
+    activityLog,
     stats,
     todayStats,
     streak,
@@ -440,6 +593,7 @@ export function useTodos(user = null, isConfigured = false) {
     error,
     lastAction,
     hasLocalTasksToMigrate,
+    pendingConflict,
     setLastAction,
     addTask,
     updateTask,
@@ -453,6 +607,11 @@ export function useTodos(user = null, isConfigured = false) {
     removeTag,
     logFocusSession,
     clearCompleted,
+    createProject,
+    updateProject,
+    deleteProject,
+    resolveConflict,
+    setPendingConflict,
     migrateLocalToCloud,
     dismissMigration,
     refreshTasks: loadCloudTasks,

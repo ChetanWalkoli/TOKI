@@ -17,14 +17,21 @@ import {
   Sun,
   Keyboard,
   ArrowRight,
+  FolderGit2,
+  Sparkles,
+  Download,
 } from 'lucide-react';
+import { downloadTasksICS } from '../../services/calendarIntegration';
 
 export default function CommandPalette({
   open,
   onClose,
   tasks = [],
+  projects = [],
   onOpenAdd,
   onEditTask,
+  onOpenPlanMyDay,
+  onOpenAIAssistant,
   theme,
   onToggleTheme,
   onOpenShortcuts,
@@ -44,10 +51,14 @@ export default function CommandPalette({
 
   const baseCommands = [
     { id: 'cmd-new', title: 'Create new task', category: 'Actions', icon: Plus, action: () => { onClose(); onOpenAdd(); } },
+    { id: 'cmd-plan', title: 'Plan my day (Smart daily scheduler)', category: 'Actions', icon: Sparkles, action: () => { onClose(); if (onOpenPlanMyDay) onOpenPlanMyDay(); } },
+    { id: 'cmd-ai', title: 'Open AI Task Assistant', category: 'Actions', icon: Sparkles, action: () => { onClose(); if (onOpenAIAssistant) onOpenAIAssistant(); } },
+    { id: 'cmd-ics', title: 'Export Calendar (.ics)', category: 'Actions', icon: Download, action: () => { onClose(); downloadTasksICS(tasks); } },
     { id: 'cmd-focus', title: 'Start Focus Mode (Pomodoro)', category: 'Actions', icon: Timer, action: () => { onClose(); navigate('/focus'); } },
     { id: 'cmd-theme', title: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} theme`, category: 'Actions', icon: theme === 'dark' ? Sun : Moon, action: () => { onClose(); onToggleTheme(); } },
     { id: 'cmd-shortcuts', title: 'View Keyboard Shortcuts', category: 'Help', icon: Keyboard, action: () => { onClose(); onOpenShortcuts(); } },
     { id: 'nav-dashboard', title: 'Go to Dashboard', category: 'Navigation', icon: Home, action: () => { onClose(); navigate('/'); } },
+    { id: 'nav-projects', title: 'Go to Projects', category: 'Navigation', icon: FolderGit2, action: () => { onClose(); navigate('/projects'); } },
     { id: 'nav-tasks', title: 'Go to Tasks', category: 'Navigation', icon: CheckSquare, action: () => { onClose(); navigate('/tasks'); } },
     { id: 'nav-kanban', title: 'Go to Kanban Board', category: 'Navigation', icon: Kanban, action: () => { onClose(); navigate('/board'); } },
     { id: 'nav-today', title: 'Go to Today', category: 'Navigation', icon: CalendarDays, action: () => { onClose(); navigate('/today'); } },

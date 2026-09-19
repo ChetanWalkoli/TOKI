@@ -43,7 +43,18 @@ export default function Upcoming({ todos, onEdit, onAdd, settings, onStartFocus 
       {buckets.overdue.length > 0 && (
         <section className="flex flex-col gap-2">
           <GroupHeader label={`Past Due (${buckets.overdue.length})`} count={buckets.overdue.length} alert />
-          <TaskList tasks={buckets.overdue} onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus} />
+          <TaskList
+            tasks={buckets.overdue}
+            allTasks={todos.tasks}
+            projects={todos.projects}
+            onToggle={todos.toggleTask}
+            onEdit={onEdit}
+            onDelete={todos.deleteTask}
+            onToggleSubtask={todos.toggleSubtask}
+            onAddSubtask={todos.addSubtask}
+            onSetStatus={todos.setTaskStatus}
+            onStartFocus={onStartFocus}
+          />
         </section>
       )}
 
@@ -54,14 +65,38 @@ export default function Upcoming({ todos, onEdit, onAdd, settings, onStartFocus 
       ].map(({ label, tasks, emptyTitle, emptySubtitle }) => (
         <section key={label} className="flex flex-col gap-2">
           <GroupHeader label={label} count={tasks.length} />
-          <TaskList tasks={tasks} onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus} emptyTitle={emptyTitle} emptySubtitle={emptySubtitle} />
+          <TaskList
+            tasks={tasks}
+            allTasks={todos.tasks}
+            projects={todos.projects}
+            onToggle={todos.toggleTask}
+            onEdit={onEdit}
+            onDelete={todos.deleteTask}
+            onToggleSubtask={todos.toggleSubtask}
+            onAddSubtask={todos.addSubtask}
+            onSetStatus={todos.setTaskStatus}
+            onStartFocus={onStartFocus}
+            emptyTitle={emptyTitle}
+            emptySubtitle={emptySubtitle}
+          />
         </section>
       ))}
 
       {buckets.noDueDate.length > 0 && (
         <section className="flex flex-col gap-2">
           <GroupHeader label="Someday / No Due Date" count={buckets.noDueDate.length} />
-          <TaskList tasks={buckets.noDueDate} onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus} />
+          <TaskList
+            tasks={buckets.noDueDate}
+            allTasks={todos.tasks}
+            projects={todos.projects}
+            onToggle={todos.toggleTask}
+            onEdit={onEdit}
+            onDelete={todos.deleteTask}
+            onToggleSubtask={todos.toggleSubtask}
+            onAddSubtask={todos.addSubtask}
+            onSetStatus={todos.setTaskStatus}
+            onStartFocus={onStartFocus}
+          />
         </section>
       )}
     </motion.div>

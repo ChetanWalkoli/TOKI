@@ -6,6 +6,7 @@ import MobileNavigation from './MobileNavigation';
 export default function AppShell({
   children,
   tasks,
+  projects = [],
   streak = 0,
   user = null,
   profile = null,
@@ -35,6 +36,7 @@ export default function AppShell({
     <div className="flex h-screen overflow-hidden bg-[var(--color-paper)]">
       <Sidebar
         tasks={tasks}
+        projects={projects}
         streak={streak}
         user={user}
         profile={profile}

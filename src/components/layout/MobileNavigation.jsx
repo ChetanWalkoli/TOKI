@@ -12,6 +12,7 @@ import {
   X,
   User,
   LogIn,
+  FolderGit2,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -57,6 +58,7 @@ export default function MobileNavigation({ onAdd, user = null }) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
+                { to: '/projects', Icon: FolderGit2, label: 'Projects' },
                 { to: '/calendar', Icon: Calendar, label: 'Calendar' },
                 { to: '/upcoming', Icon: CalendarDays, label: 'Upcoming' },
                 { to: '/analytics', Icon: BarChart3, label: 'Analytics' },

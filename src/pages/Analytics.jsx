@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, CheckCircle2, TrendingUp, Timer, Award, Calendar, Layers } from 'lucide-react';
+import { Flame, CheckCircle2, TrendingUp, Timer, Award, Calendar, Layers, Sparkles } from 'lucide-react';
 import { useAchievements } from '../hooks/useAchievements';
 import { categories, priorityOptions } from '../utils/task';
+import ProductivityInsights from '../components/analytics/ProductivityInsights';
 
 const eyebrowCls = 'text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase';
 
@@ -111,6 +112,11 @@ export default function Analytics({ todos, pomodoro }) {
           })}
         </div>
         <p className="text-[11px] text-[var(--color-muted)]">Number of tasks completed per day over the past week</p>
+      </section>
+
+      {/* Productivity Insights */}
+      <section aria-label="Productivity insights">
+        <ProductivityInsights tasks={tasks} focusHistory={history} />
       </section>
 
       {/* Category breakdown */}

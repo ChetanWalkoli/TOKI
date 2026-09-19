@@ -123,6 +123,8 @@ export default function CalendarView({ todos, onAdd, onEdit, settings }) {
           <div className="flex-1 overflow-y-auto">
             <TaskList
               tasks={selectedDayTasks}
+              allTasks={todos.tasks}
+              projects={todos.projects}
               onToggle={todos.toggleTask}
               onEdit={onEdit}
               onDelete={todos.deleteTask}

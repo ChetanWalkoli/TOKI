@@ -3,6 +3,8 @@ import TaskCard from './TaskCard';
 
 export default function TaskList({
   tasks = [],
+  allTasks = [],
+  projects = [],
   onToggle,
   onEdit,
   onDelete,
@@ -33,6 +35,8 @@ export default function TaskList({
           <TaskCard
             key={task.id}
             task={task}
+            allTasks={allTasks.length > 0 ? allTasks : tasks}
+            projects={projects}
             onToggle={onToggle}
             onEdit={onEdit}
             onDelete={onDelete}

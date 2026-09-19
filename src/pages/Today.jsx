@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import TaskList from '../components/tasks/TaskList';
 import QuickAddInput from '../components/tasks/QuickAddInput';
 import { isOverdue, getTodayString } from '../utils/task';
 
 const eyebrowCls = 'text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase';
 
-export default function Today({ todos, onEdit, onAdd, settings, onStartFocus }) {
+export default function Today({ todos, onEdit, onAdd, settings, onStartFocus, onOpenPlanMyDay }) {
   const [showCompleted, setShowCompleted] = useState(true);
   const todayStr = getTodayString();
+  const projects = todos.projects || [];
 
   const overdueTasks   = todos.tasks.filter(isOverdue);
   const todayRemaining = todos.tasks.filter((t) => !t.completed && t.dueDate === todayStr);
@@ -33,7 +34,19 @@ export default function Today({ todos, onEdit, onAdd, settings, onStartFocus }) 
     >
       {/* Page title */}
       <div className="flex flex-col gap-2">
-        <p className={eyebrowCls}>{dateFormatted}</p>
+        <div className="flex items-center justify-between">
+          <p className={eyebrowCls}>{dateFormatted}</p>
+          {onOpenPlanMyDay && (
+            <button
+              type="button"
+              onClick={onOpenPlanMyDay}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--color-coral-subtle)] text-[var(--color-coral)] text-xs font-semibold hover:bg-[#f8dfd8] transition-colors"
+            >
+              <Sparkles size={13} />
+              <span>Plan my day</span>
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <h1 className="font-['Fraunces'] text-3xl font-semibold text-[var(--color-ink)]">Today</h1>
           <div className="flex items-center gap-2 ml-auto">
@@ -63,7 +76,18 @@ export default function Today({ todos, onEdit, onAdd, settings, onStartFocus }) 
             <p className={`${eyebrowCls} text-[var(--color-red)]`}>Needs Attention ({overdueTasks.length})</p>
           </div>
           <div className="mt-2">
-            <TaskList tasks={overdueTasks} onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus} />
+            <TaskList
+              tasks={overdueTasks}
+              allTasks={todos.tasks}
+              projects={projects}
+              onToggle={todos.toggleTask}
+              onEdit={onEdit}
+              onDelete={todos.deleteTask}
+              onToggleSubtask={todos.toggleSubtask}
+              onAddSubtask={todos.addSubtask}
+              onSetStatus={todos.setTaskStatus}
+              onStartFocus={onStartFocus}
+            />
           </div>
         </section>
       )}
@@ -76,7 +100,15 @@ export default function Today({ todos, onEdit, onAdd, settings, onStartFocus }) 
         <div className="mt-2">
           <TaskList
             tasks={todayRemaining}
-            onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus}
+            allTasks={todos.tasks}
+            projects={projects}
+            onToggle={todos.toggleTask}
+            onEdit={onEdit}
+            onDelete={todos.deleteTask}
+            onToggleSubtask={todos.toggleSubtask}
+            onAddSubtask={todos.addSubtask}
+            onSetStatus={todos.setTaskStatus}
+            onStartFocus={onStartFocus}
             emptyTitle={totalToday > 0 && remainingTodayCount === 0 ? 'Your list is clear. Nice!' : 'No tasks scheduled for today'}
             emptySubtitle={totalToday > 0 && remainingTodayCount === 0 ? 'You have completed all your tasks for today. Rest easy or add more if you like.' : 'Enjoy a free day or plan something gentle using the input above.'}
           />
@@ -98,7 +130,18 @@ export default function Today({ todos, onEdit, onAdd, settings, onStartFocus }) 
           </button>
           {showCompleted && (
             <div className="mt-2">
-              <TaskList tasks={todayCompleted} onToggle={todos.toggleTask} onEdit={onEdit} onDelete={todos.deleteTask} onToggleSubtask={todos.toggleSubtask} onAddSubtask={todos.addSubtask} onSetStatus={todos.setTaskStatus} onStartFocus={onStartFocus} />
+              <TaskList
+                tasks={todayCompleted}
+                allTasks={todos.tasks}
+                projects={projects}
+                onToggle={todos.toggleTask}
+                onEdit={onEdit}
+                onDelete={todos.deleteTask}
+                onToggleSubtask={todos.toggleSubtask}
+                onAddSubtask={todos.addSubtask}
+                onSetStatus={todos.setTaskStatus}
+                onStartFocus={onStartFocus}
+              />
             </div>
           )}
         </section>
