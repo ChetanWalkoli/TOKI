@@ -1,38 +1,114 @@
 import { useEffect, useMemo, useState } from 'react';
 import { initialTasks } from '../data/seed';
-import { readStore, writeStore } from '../services/storage';
+import { readStore, writeStore, sanitizeTask } from '../services/storage';
+import { getTodayStats } from '../utils/task';
 
 export function useTodos() {
   const [tasks, setTasks] = useState(() => {
     const stored = readStore({ tasks: initialTasks }).tasks;
-    return Array.isArray(stored) ? stored.filter((task) => task && typeof task.title === 'string') : initialTasks;
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored.map(sanitizeTask).filter(Boolean);
+    }
+    return initialTasks.map(sanitizeTask).filter(Boolean);
   });
+
   const [lastAction, setLastAction] = useState('idle');
 
-  const addTask = (task) => {
-    setTasks((items) => [{ ...task, id: crypto.randomUUID(), completed: false, createdAt: Date.now(), updatedAt: Date.now() }, ...items]);
-    setLastAction('created');
-  };
-  const updateTask = (id, changes) => {
-    setTasks((items) => items.map((task) => task.id === id ? { ...task, ...changes, updatedAt: Date.now() } : task));
-    setLastAction('edited');
-  };
-  const deleteTask = (id) => {
-    setTasks((items) => items.filter((task) => task.id !== id));
-    setLastAction('deleted');
-  };
-  const toggleTask = (id) => {
-    setTasks((items) => items.map((task) => task.id === id ? { ...task, completed: !task.completed, completedAt: task.completed ? null : Date.now(), updatedAt: Date.now() } : task));
-    const task = tasks.find((item) => item.id === id);
-    setLastAction(task?.completed ? 'reopened' : 'completed');
-  };
-  const stats = useMemo(() => {
-    const total = tasks.length;
-    const complete = tasks.filter((task) => task.completed).length;
-    return { total, complete, percent: total ? Math.round((complete / total) * 100) : 0 };
+  // Persist tasks whenever they change
+  useEffect(() => {
+    const currentStore = readStore({});
+    writeStore({ ...currentStore, tasks });
   }, [tasks]);
 
-  useEffect(() => { writeStore({ ...readStore({}), tasks }); }, [tasks]);
+  const addTask = (taskData) => {
+    const now = Date.now();
+    const newTask = sanitizeTask({
+      id: crypto.randomUUID(),
+      title: taskData.title,
+      description: taskData.description || '',
+      priority: taskData.priority || 'Medium',
+      category: taskData.category || 'Personal',
+      dueDate: taskData.dueDate || new Date().toISOString().slice(0, 10),
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    });
 
-  return { tasks, stats, lastAction, addTask, updateTask, deleteTask, toggleTask, clearCompleted: () => { setTasks((items) => items.filter((task) => !task.completed)); setLastAction('cleared'); } };
+    if (newTask) {
+      setTasks((prev) => [newTask, ...prev]);
+      setLastAction('created');
+      return newTask;
+    }
+    return null;
+  };
+
+  const updateTask = (id, changes) => {
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id !== id) return task;
+        return sanitizeTask({
+          ...task,
+          ...changes,
+          updatedAt: Date.now(),
+        });
+      })
+    );
+    setLastAction('edited');
+  };
+
+  const deleteTask = (id) => {
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+    setLastAction('deleted');
+  };
+
+  const toggleTask = (id) => {
+    let nextStatus = false;
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id !== id) return task;
+        nextStatus = !task.completed;
+        const now = Date.now();
+        return {
+          ...task,
+          completed: nextStatus,
+          completedAt: nextStatus ? now : null,
+          updatedAt: now,
+        };
+      })
+    );
+    setLastAction(nextStatus ? 'completed' : 'reopened');
+  };
+
+  const clearCompleted = () => {
+    setTasks((prev) => prev.filter((task) => !task.completed));
+    setLastAction('cleared');
+  };
+
+  // Overall metrics across all tasks
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const complete = tasks.filter((t) => t.completed).length;
+    const remaining = total - complete;
+    const percent = total > 0 ? Math.round((complete / total) * 100) : 0;
+    return { total, complete, remaining, percent };
+  }, [tasks]);
+
+  // Today specific metrics
+  const todayStats = useMemo(() => {
+    return getTodayStats(tasks);
+  }, [tasks]);
+
+  return {
+    tasks,
+    stats,
+    todayStats,
+    lastAction,
+    addTask,
+    updateTask,
+    deleteTask,
+    toggleTask,
+    clearCompleted,
+    setTasks,
+  };
 }

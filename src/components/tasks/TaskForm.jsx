@@ -1,22 +1,151 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { categories, priorityOptions, toDateInput } from '../../utils/task';
 
-const blank = (defaults = {}) => ({ title: '', description: '', priority: defaults.defaultPriority || 'medium', category: defaults.defaultCategory || 'Personal', dueDate: toDateInput() });
+const getInitialState = (task, defaults = {}) => {
+  if (task && task.id) {
+    return {
+      title: task.title || '',
+      description: task.description || '',
+      priority: task.priority || defaults.defaultPriority || 'Medium',
+      category: task.category || defaults.defaultCategory || 'Personal',
+      dueDate: task.dueDate !== undefined ? task.dueDate : toDateInput(),
+    };
+  }
 
-export default function TaskForm({ task, defaults, onSave, onCancel }) {
-  const [form, setForm] = useState(task ? { ...blank(defaults), ...task } : blank(defaults));
-  const [advanced, setAdvanced] = useState(Boolean(task));
-  const update = (event) => setForm((value) => ({ ...value, [event.target.name]: event.target.value }));
-  const submit = (event) => { event.preventDefault(); if (form.title.trim()) onSave({ ...form, title: form.title.trim() }); };
-  return <form className="task-form" onSubmit={submit}>
-    <label className="field"><span>What needs doing?</span><input name="title" value={form.title} onChange={update} placeholder="Write it here…" autoFocus required /></label>
-    <button type="button" className="advanced-toggle" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced}>Add a few details <ChevronDown size={16} className={advanced ? 'rotated' : ''} /></button>
-    {advanced && <div className="form-details">
-      <label className="field"><span>Description <em>optional</em></span><textarea name="description" value={form.description} onChange={update} placeholder="A little context helps future you." rows="3" /></label>
-      <div className="form-grid"><label className="field"><span>Priority</span><select name="priority" value={form.priority} onChange={update}>{priorityOptions.map((item) => <option key={item} value={item}>{item[0].toUpperCase() + item.slice(1)}</option>)}</select></label><label className="field"><span>Category</span><select name="category" value={form.category} onChange={update}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label></div>
-      <label className="field"><span>Due date</span><input type="date" name="dueDate" value={form.dueDate} onChange={update} /></label>
-    </div>}
-    <div className="form-actions"><button type="button" className="button button-ghost" onClick={onCancel}>Cancel</button><button className="button button-primary" type="submit">{task ? 'Save changes' : 'Add task'} <span>→</span></button></div>
-  </form>;
+  return {
+    title: task?.title || '',
+    description: task?.description || '',
+    priority: task?.priority || defaults.defaultPriority || 'Medium',
+    category: task?.category || defaults.defaultCategory || 'Personal',
+    dueDate: task?.dueDate !== undefined ? task?.dueDate : toDateInput(),
+  };
+};
+
+export default function TaskForm({ task, defaults = {}, onSave, onCancel }) {
+  const [form, setForm] = useState(() => getInitialState(task, defaults));
+  const [error, setError] = useState('');
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === 'title' && value.trim()) {
+      setError('');
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanTitle = form.title.trim();
+    if (!cleanTitle) {
+      setError('Please give your task a title.');
+      return;
+    }
+
+    onSave({
+      ...form,
+      title: cleanTitle,
+      description: form.description.trim(),
+    });
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <form className="task-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
+      <div className="field">
+        <label htmlFor="task-title-input">
+          Task title <span className="required-star">*</span>
+        </label>
+        <input
+          id="task-title-input"
+          name="title"
+          type="text"
+          value={form.title}
+          onChange={handleChange}
+          placeholder="e.g., Draft project summary"
+          autoFocus
+        />
+        {error && <p className="field-error" role="alert">{error}</p>}
+      </div>
+
+      <div className="field">
+        <label htmlFor="task-desc-input">
+          Notes / Context <em className="optional-label">(optional)</em>
+        </label>
+        <textarea
+          id="task-desc-input"
+          name="description"
+          value={form.description}
+          onChange={handleChange}
+          placeholder="Add details, links, or notes to help future you…"
+          rows={3}
+        />
+      </div>
+
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="task-priority-select">Priority</label>
+          <select
+            id="task-priority-select"
+            name="priority"
+            value={form.priority}
+            onChange={handleChange}
+          >
+            {priorityOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="task-category-select">Category</label>
+          <select
+            id="task-category-select"
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="task-duedate-input">Due date</label>
+        <input
+          id="task-duedate-input"
+          type="date"
+          name="dueDate"
+          value={form.dueDate}
+          onChange={handleChange}
+        />
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="button button-ghost"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="button button-primary"
+        >
+          {task?.id ? 'Save changes' : 'Add task'}
+        </button>
+      </div>
+    </form>
+  );
 }

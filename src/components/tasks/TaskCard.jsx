@@ -1,12 +1,122 @@
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarDays, Check, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarDays, Check, MoreHorizontal, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { formatDueDate, isOverdue } from '../../utils/task';
 
 export default function TaskCard({ task, onToggle, onEdit, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  return <motion.article layout className={`task-card ${task.completed ? 'is-complete' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, scale: task.completed ? .985 : 1 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: .22 }}>
-    <button className="task-check" onClick={() => onToggle(task.id)} aria-label={task.completed ? `Mark ${task.title} incomplete` : `Complete ${task.title}`}><motion.span animate={task.completed ? { scale: [0, 1.25, 1] } : { scale: 1 }} transition={{ duration: .26 }}>{task.completed && <Check size={15} strokeWidth={3} />}</motion.span></button>
-    <div className="task-content"><h3>{task.title}</h3>{task.description && <p>{task.description}</p>}<div className="task-meta"><span className={`priority priority-${task.priority}`}><i />{task.priority}</span><span><CalendarDays size={14} /> {task.dueDate === new Date().toISOString().slice(0, 10) ? 'Today' : task.dueDate}</span><span className="category-pill">{task.category}</span></div></div>
-    <div className="task-menu"><button className="icon-button" aria-label={`Options for ${task.title}`} onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>{menuOpen && <div className="menu-popover"><button onClick={() => onEdit(task)}><Pencil size={15} /> Edit</button><button className="danger" onClick={() => onDelete(task.id)}><Trash2 size={15} /> Delete</button></div>}</div>
-  </motion.article>;
+  const menuRef = useRef(null);
+  const overdue = isOverdue(task);
+
+  // Close menu on click outside or escape key
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleDocumentClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  const handleEdit = () => {
+    setMenuOpen(false);
+    onEdit(task);
+  };
+
+  const handleDelete = () => {
+    setMenuOpen(false);
+    onDelete(task.id);
+  };
+
+  return (
+    <motion.article
+      layout
+      className={`task-card ${task.completed ? 'is-complete' : ''} ${overdue ? 'task-overdue' : ''}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+    >
+      <button
+        type="button"
+        className="task-check"
+        onClick={() => onToggle(task.id)}
+        aria-label={task.completed ? `Mark "${task.title}" incomplete` : `Mark "${task.title}" complete`}
+      >
+        <motion.span
+          className="check-icon-wrap"
+          initial={false}
+          animate={task.completed ? { scale: [0.6, 1.2, 1] } : { scale: 1 }}
+          transition={{ duration: 0.2 }}
+        >
+          {task.completed && <Check size={14} strokeWidth={3} />}
+        </motion.span>
+      </button>
+
+      <div className="task-content">
+        <div className="task-header-row">
+          <h3 className="task-title">{task.title}</h3>
+        </div>
+
+        {task.description && <p className="task-description">{task.description}</p>}
+
+        <div className="task-meta">
+          <span className={`priority-pill priority-${task.priority.toLowerCase()}`}>
+            <i className="priority-dot" />
+            <span>{task.priority}</span>
+          </span>
+
+          {task.dueDate && (
+            <span className={`due-pill ${overdue ? 'due-overdue' : ''}`}>
+              {overdue ? <AlertCircle size={13} /> : <CalendarDays size={13} />}
+              <span>{formatDueDate(task.dueDate)}</span>
+            </span>
+          )}
+
+          <span className="category-pill">{task.category}</span>
+        </div>
+      </div>
+
+      <div className="task-actions" ref={menuRef}>
+        <button
+          type="button"
+          className="icon-button menu-trigger"
+          aria-label={`Options for "${task.title}"`}
+          aria-expanded={menuOpen}
+          aria-haspopup="true"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+
+        {menuOpen && (
+          <div className="menu-popover" role="menu">
+            <button type="button" role="menuitem" onClick={handleEdit}>
+              <Pencil size={14} />
+              <span>Edit</span>
+            </button>
+            <button type="button" role="menuitem" className="danger" onClick={handleDelete}>
+              <Trash2 size={14} />
+              <span>Delete</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.article>
+  );
 }
