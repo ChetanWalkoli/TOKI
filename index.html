@@ -3,9 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f7f5ff" />
+    <meta name="theme-color" content="#f7f3eb" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Toki — Your productivity companion</title>
+    <!-- Blocking theme script: runs before React to prevent flash of wrong theme -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('toki:v1');
+          var theme = 'system';
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            if (parsed && parsed.settings && parsed.settings.theme) {
+              theme = parsed.settings.theme;
+            }
+          }
+          var isDark =
+            theme === 'dark' ||
+            (theme === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+          // Update theme-color meta tag
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', isDark ? '#1c1e1c' : '#f7f3eb');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

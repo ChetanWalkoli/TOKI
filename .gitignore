@@ -15,14 +15,6 @@ node_modules/
 # NEVER commit credentials to GitHub
 # ----------------------------
 .env
-.env.local
-.env.development
-.env.development.local
-.env.test
-.env.test.local
-.env.staging
-.env.production
-.env.production.local
 *.env
 *.env.*
 !.env.example
@@ -109,3 +101,4 @@ tmp/
 .stylelintcache
 .parcel-cache/
 *.tsbuildinfo
+.env

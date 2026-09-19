@@ -52,6 +52,7 @@
 
 /* ==========================================================================
    DARK THEME OVERRIDES (CSS variable swap)
+   Applied via JS: document.documentElement.setAttribute('data-theme', 'dark')
    ========================================================================== */
 [data-theme='dark'] {
   --color-paper:        #1c1e1c;
@@ -84,6 +85,46 @@
   --shadow-md: 0 8px 22px rgba(0,0,0,0.4);
   --shadow-lg: 0 20px 48px rgba(0,0,0,0.55);
 }
+
+/* ==========================================================================
+   SYSTEM DARK MODE — pure CSS fallback
+   Activates when OS is dark AND JS has not yet (or cannot) set data-theme.
+   Once JS sets data-theme='light' or data-theme='dark', that takes priority.
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-paper:        #1c1e1c;
+    --color-paper-deep:   #242824;
+    --color-paper-card:   #232723;
+    --color-paper-subtle: #292e29;
+
+    --color-ink:           #f2ede4;
+    --color-ink-secondary: #b5aea1;
+    --color-muted:         #8c8577;
+
+    --color-line:        #363b35;
+    --color-line-subtle: #2b302a;
+    --color-line-strong: #495048;
+
+    --color-coral:        #e57d66;
+    --color-coral-hover:  #f18e77;
+    --color-coral-subtle: #36221d;
+
+    --color-butter:        #d8b752;
+    --color-butter-subtle: #332b17;
+
+    --color-leaf:        #69a27b;
+    --color-leaf-subtle: #1c2b20;
+
+    --color-red:        #d66c61;
+    --color-red-subtle: #361f1c;
+
+    --shadow-sm: 0 2px 5px rgba(0,0,0,0.25);
+    --shadow-md: 0 8px 22px rgba(0,0,0,0.4);
+    --shadow-lg: 0 20px 48px rgba(0,0,0,0.55);
+  }
+}
+
 
 /* ==========================================================================
    BASE RESET
