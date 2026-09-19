@@ -1,0 +1,3 @@
+import { CalendarDays, CheckSquare, Home, Sunrise } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+export default function MobileNavigation({ onAdd }) { return <><button className="mobile-add" onClick={onAdd} aria-label="Add task">+</button><nav className="mobile-nav" aria-label="Mobile navigation"><NavLink to="/"><Home size={19} /><span>Home</span></NavLink><NavLink to="/tasks"><CheckSquare size={19} /><span>Tasks</span></NavLink><NavLink to="/today"><CalendarDays size={19} /><span>Today</span></NavLink><NavLink to="/upcoming"><Sunrise size={19} /><span>Next</span></NavLink></nav></>; }

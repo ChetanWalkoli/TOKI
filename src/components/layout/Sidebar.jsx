@@ -1,0 +1,5 @@
+import { CalendarDays, CheckSquare, CircleUserRound, Home, Settings, Sunrise } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+
+const nav = [{ to: '/', label: 'Dashboard', icon: Home }, { to: '/tasks', label: 'Tasks', icon: CheckSquare }, { to: '/today', label: 'Today', icon: CalendarDays }, { to: '/upcoming', label: 'Upcoming', icon: Sunrise }];
+export default function Sidebar() { return <aside className="sidebar"><NavLink to="/" className="brand"><span className="brand-mark">t</span><span>Toki</span></NavLink><p className="nav-caption">your space</p><nav aria-label="Main navigation">{nav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={18} /><span>{label}</span></NavLink>)}</nav><div className="sidebar-bottom"><p className="side-note">Small steps count.</p><button className="profile-button"><span>C</span><div><strong>Chetan</strong><small>Personal workspace</small></div><CircleUserRound size={17} /></button><NavLink className="settings-link" to="/settings"><Settings size={17} /> Settings</NavLink></div></aside>; }
