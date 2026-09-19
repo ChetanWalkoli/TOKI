@@ -1,35 +1,73 @@
-import { useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import AppShell from './components/layout/AppShell';
 import Modal from './components/common/Modal';
 import TaskForm from './components/tasks/TaskForm';
 import ConfirmDialog from './components/common/ConfirmDialog';
+import CommandPalette from './components/common/CommandPalette';
+import KeyboardShortcutsModal from './components/common/KeyboardShortcutsModal';
+import MigrateModal from './components/common/MigrateModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { useTodos } from './hooks/useTodos';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
+import { usePomodoro } from './hooks/usePomodoro';
+import { logCloudFocusSession } from './services/focus';
+import { sendBrowserNotification } from './services/notifications';
+
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
+import Kanban from './pages/Kanban';
 import Today from './pages/Today';
 import Upcoming from './pages/Upcoming';
+import CalendarView from './pages/CalendarView';
+import FocusMode from './pages/FocusMode';
+import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
 import { clearStore } from './services/storage';
 
-export default function App() {
-  const todos = useTodos();
+function AppContent() {
+  const { user, profile, isConfigured } = useAuth();
+  const todos = useTodos(user, isConfigured);
   const { settings, updateSettings } = useSettings();
-  useTheme(settings.theme);
+  useTheme(profile?.themePreference || settings.theme);
 
-  const [editingTask, setEditingTask] = useState(null); // null when modal closed, object when open
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const pomodoro = usePomodoro((taskId, minutes) => {
+    todos.logFocusSession(taskId, minutes);
+    if (user && isConfigured) {
+      logCloudFocusSession(user.id, taskId, minutes);
+    }
+    // Browser notification when focus completes
+    if (profile?.notificationsEnabled ?? true) {
+      sendBrowserNotification('Focus session complete! 🎉', {
+        body: 'Great work. Take a 5-minute breather or celebrate the progress.',
+      });
+    }
+  });
+
+  const [editingTask, setEditingTask] = useState(null);
   const [query, setQuery] = useState('');
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   const handleOpenAdd = (prefill = {}) => {
     setEditingTask({
       title: '',
       description: '',
-      priority: settings.defaultPriority || 'Medium',
-      category: settings.defaultCategory || 'Personal',
+      priority: profile?.defaultPriority || settings.defaultPriority || 'Medium',
+      category: profile?.defaultCategory || settings.defaultCategory || 'Personal',
       dueDate: new Date().toISOString().slice(0, 10),
+      status: 'todo',
+      subtasks: [],
+      tags: [],
       ...prefill,
     });
   };
@@ -42,11 +80,11 @@ export default function App() {
     setEditingTask(null);
   };
 
-  const handleSaveTask = (taskData) => {
+  const handleSaveTask = async (taskData) => {
     if (editingTask?.id) {
-      todos.updateTask(editingTask.id, taskData);
+      await todos.updateTask(editingTask.id, taskData);
     } else {
-      todos.addTask(taskData);
+      await todos.addTask(taskData);
     }
     handleCloseModal();
   };
@@ -56,14 +94,98 @@ export default function App() {
     window.location.reload();
   };
 
+  const handleToggleTheme = () => {
+    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    updateSettings({ theme: nextTheme });
+  };
+
+  const handleStartFocusForTask = (taskId) => {
+    pomodoro.setSelectedTaskId(taskId);
+    navigate(`/focus?taskId=${taskId}`);
+  };
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      const activeTag = document.activeElement?.tagName;
+      const isInputActive =
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        activeTag === 'SELECT' ||
+        document.activeElement?.isContentEditable;
+
+      if (isInputActive) return;
+
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        handleOpenAdd();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        navigate('/focus');
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        navigate('/');
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        navigate('/today');
+      } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        navigate('/board');
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        navigate('/calendar');
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        navigate('/analytics');
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
   const completedCount = todos.tasks.filter((t) => t.completed).length;
+
+  // Render standalone auth pages when on auth routes
+  const isAuthRoute =
+    location.pathname === '/login' ||
+    location.pathname === '/signup' ||
+    location.pathname === '/forgot-password';
+
+  if (isAuthRoute) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <AppShell
       tasks={todos.tasks}
+      streak={todos.streak}
+      user={user}
+      profile={profile}
       onAdd={() => handleOpenAdd()}
       query={query}
       onQueryChange={setQuery}
+      onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      onOpenShortcuts={() => setShortcutsModalOpen(true)}
     >
       <Routes>
         <Route
@@ -74,6 +196,7 @@ export default function App() {
               onAdd={handleOpenAdd}
               onEdit={handleOpenEdit}
               settings={settings}
+              onStartFocus={handleStartFocusForTask}
             />
           }
         />
@@ -88,6 +211,17 @@ export default function App() {
               onQueryChange={setQuery}
               settings={settings}
               onClearCompleted={() => setConfirmClearOpen(true)}
+              onStartFocus={handleStartFocusForTask}
+            />
+          }
+        />
+        <Route
+          path="/board"
+          element={
+            <Kanban
+              todos={todos}
+              onAdd={handleOpenAdd}
+              onEdit={handleOpenEdit}
             />
           }
         />
@@ -99,6 +233,7 @@ export default function App() {
               onAdd={handleOpenAdd}
               onEdit={handleOpenEdit}
               settings={settings}
+              onStartFocus={handleStartFocusForTask}
             />
           }
         />
@@ -110,8 +245,42 @@ export default function App() {
               onAdd={handleOpenAdd}
               onEdit={handleOpenEdit}
               settings={settings}
+              onStartFocus={handleStartFocusForTask}
             />
           }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <CalendarView
+              todos={todos}
+              onAdd={handleOpenAdd}
+              onEdit={handleOpenEdit}
+              settings={settings}
+            />
+          }
+        />
+        <Route
+          path="/focus"
+          element={
+            <FocusMode
+              todos={todos}
+              pomodoro={pomodoro}
+            />
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <Analytics
+              todos={todos}
+              pomodoro={pomodoro}
+            />
+          }
+        />
+        <Route
+          path="/profile"
+          element={<Profile />}
         />
         <Route
           path="/settings"
@@ -135,14 +304,14 @@ export default function App() {
         title={editingTask?.id ? 'Edit task' : 'Add a new task'}
       >
         <TaskForm
-          task={editingTask?.id ? editingTask : editingTask}
+          task={editingTask}
           defaults={settings}
           onSave={handleSaveTask}
           onCancel={handleCloseModal}
         />
       </Modal>
 
-      {/* Confirmation modal for clearing completed tasks from tasks page */}
+      {/* Confirmation modal for clearing completed tasks */}
       <ConfirmDialog
         open={confirmClearOpen}
         title="Clear completed tasks?"
@@ -156,6 +325,39 @@ export default function App() {
         }}
         onCancel={() => setConfirmClearOpen(false)}
       />
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        tasks={todos.tasks}
+        onOpenAdd={handleOpenAdd}
+        onEditTask={handleOpenEdit}
+        theme={settings.theme}
+        onToggleTheme={handleToggleTheme}
+        onOpenShortcuts={() => setShortcutsModalOpen(true)}
+      />
+
+      {/* Keyboard Shortcuts Cheat Sheet */}
+      <KeyboardShortcutsModal
+        open={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
+      />
+
+      {/* Local Storage Migration Prompt Modal */}
+      <MigrateModal
+        open={todos.hasLocalTasksToMigrate}
+        onConfirm={todos.migrateLocalToCloud}
+        onDismiss={todos.dismissMigration}
+      />
     </AppShell>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

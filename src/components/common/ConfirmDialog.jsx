@@ -13,26 +13,29 @@ export default function ConfirmDialog({
 }) {
   return (
     <Modal open={open} onClose={onCancel} title={title}>
-      <div className="confirm-dialog-body">
+      <div className="flex flex-col gap-4">
         {isDanger && (
-          <div className="confirm-dialog-warning-icon" aria-hidden="true">
-            <AlertTriangle size={24} />
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-red-subtle)] text-[var(--color-red)] mx-auto" aria-hidden="true">
+            <AlertTriangle size={22} />
           </div>
         )}
-        <p className="confirm-dialog-message">{message}</p>
-
-        <div className="form-actions">
+        <p className="text-sm text-[var(--color-ink-secondary)] leading-relaxed text-center">{message}</p>
+        <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-line-subtle)]">
           <button
             type="button"
-            className="button button-ghost"
             onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-[var(--color-line)] text-[var(--color-ink-secondary)] text-sm font-medium hover:bg-[var(--color-paper-deep)] transition-colors"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
-            className={`button ${isDanger ? 'button-danger' : 'button-primary'}`}
             onClick={onConfirm}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
+              isDanger
+                ? 'bg-[var(--color-red)] hover:brightness-90'
+                : 'bg-[var(--color-coral)] hover:bg-[var(--color-coral-hover)]'
+            }`}
           >
             {confirmLabel}
           </button>

@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&display=swap');
+
+@import "tailwindcss";
+
+/* ==========================================================================
+   TOKI DESIGN TOKENS — mapped to Tailwind @theme
+   ========================================================================== */
+@theme {
+  /* Brand Colors */
+  --color-paper:           #f7f3eb;
+  --color-paper-deep:      #eee7dc;
+  --color-paper-card:      #ffffff;
+  --color-paper-subtle:    #faf6f0;
+
+  --color-ink:             #212529;
+  --color-ink-secondary:   #595e66;
+  --color-muted:           #807b73;
+
+  --color-line:            #ded6c9;
+  --color-line-subtle:     #eae3d7;
+  --color-line-strong:     #c2b8a6;
+
+  --color-coral:           #dc6b54;
+  --color-coral-hover:     #ca5740;
+  --color-coral-subtle:    #faede9;
+
+  --color-butter:          #deb23c;
+  --color-butter-subtle:   #fdf6e2;
+
+  --color-leaf:            #528562;
+  --color-leaf-subtle:     #ebf4ee;
+
+  --color-red:             #c2584d;
+  --color-red-subtle:      #fceeed;
+
+  /* Fonts */
+  --font-body:      'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-editorial: 'Fraunces', Georgia, serif;
+  --font-mono:      'DM Mono', monospace;
+
+  /* Radii */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 5px rgba(33,37,41,0.04);
+  --shadow-md: 0 8px 22px rgba(33,37,41,0.07);
+  --shadow-lg: 0 20px 48px rgba(33,37,41,0.12);
+}
+
+/* ==========================================================================
+   DARK THEME OVERRIDES (CSS variable swap)
+   ========================================================================== */
+[data-theme='dark'] {
+  --color-paper:        #1c1e1c;
+  --color-paper-deep:   #242824;
+  --color-paper-card:   #232723;
+  --color-paper-subtle: #292e29;
+
+  --color-ink:           #f2ede4;
+  --color-ink-secondary: #b5aea1;
+  --color-muted:         #8c8577;
+
+  --color-line:        #363b35;
+  --color-line-subtle: #2b302a;
+  --color-line-strong: #495048;
+
+  --color-coral:        #e57d66;
+  --color-coral-hover:  #f18e77;
+  --color-coral-subtle: #36221d;
+
+  --color-butter:        #d8b752;
+  --color-butter-subtle: #332b17;
+
+  --color-leaf:        #69a27b;
+  --color-leaf-subtle: #1c2b20;
+
+  --color-red:        #d66c61;
+  --color-red-subtle: #361f1c;
+
+  --shadow-sm: 0 2px 5px rgba(0,0,0,0.25);
+  --shadow-md: 0 8px 22px rgba(0,0,0,0.4);
+  --shadow-lg: 0 20px 48px rgba(0,0,0,0.55);
+}
+
+/* ==========================================================================
+   BASE RESET
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-family: var(--font-body); color: var(--color-ink); background-color: var(--color-paper); }
+
+body {
+  min-width: 320px;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input[type='search']::-webkit-search-cancel-button { display: none; }
+
+/* SVG Timer circles */
+.timer-track {
+  fill: none;
+  stroke: var(--color-line);
+}
+.timer-progress {
+  fill: none;
+  stroke: var(--color-coral);
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 1s linear;
+}
+.progress-break { stroke: var(--color-butter); }
+
+/* ==========================================================================
+   KEYFRAME ANIMATIONS  (referenced by Tailwind animate-* or inline styles)
+   ========================================================================== */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bounceIn {
+  0%   { transform: scale(0.7); opacity: 0; }
+  60%  { transform: scale(1.1); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+@keyframes pulse-gentle {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  50%       { transform: scaleY(1.05) scaleX(0.97); }
+}
+@keyframes blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95%            { transform: scaleY(0.1); }
+}
+@keyframes tail-wag {
+  0%, 100% { transform: rotate(-12deg); }
+  50%       { transform: rotate(12deg); }
+}
+@keyframes ear-perk {
+  0%, 100% { transform: rotate(-5deg); }
+  50%       { transform: rotate(5deg); }
+}
+@keyframes bounce-happy {
+  0%, 100% { transform: translateY(0); }
+  40%       { transform: translateY(-10px); }
+  60%       { transform: translateY(-6px); }
+}
+@keyframes sparkle-pop {
+  0%   { transform: scale(0) rotate(0deg); opacity: 0; }
+  50%  { transform: scale(1.2) rotate(20deg); opacity: 1; }
+  100% { transform: scale(1) rotate(10deg); opacity: 0.8; }
+}
+@keyframes float-z {
+  0%, 100% { transform: translateY(0) rotate(-5deg); opacity: 0.7; }
+  50%       { transform: translateY(-8px) rotate(5deg); opacity: 0.4; }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(40px) rotate(360deg); opacity: 0; }
+}
+
+/* Toki Companion SVG state classes */
+.companion-svg { overflow: visible; }
+.toki-body { fill: var(--color-paper-card); stroke: var(--color-line-strong); stroke-width: 1.5; }
+.toki-body-breathing { animation: breathe 4s ease-in-out infinite; transform-origin: center; }
+.toki-eye { animation: blink 4s ease-in-out infinite; transform-origin: center; }
+.toki-ear-left { animation: ear-perk 3s ease-in-out infinite; transform-origin: bottom center; }
+.toki-tail { animation: tail-wag 1.5s ease-in-out infinite; transform-origin: top center; }
+.toki-bounce { animation: bounce-happy 0.8s ease-in-out infinite; }
+.toki-sparkle { animation: sparkle-pop 0.6s ease-out forwards; }
+.toki-z-float { animation: float-z 2s ease-in-out infinite; }
+.toki-confetti { animation: confetti-fall 1.2s ease-out forwards; }
+.toki-pulse { animation: pulse-gentle 2s ease-in-out infinite; }
+
+/* ==========================================================================
+   PREFERS REDUCED MOTION
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   TOKI COMPANION MASCOT — complex shape CSS (not trivially Tailwind-able)
+   ========================================================================== */
+.companion {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 86px;
+}
+.companion-small {
+  transform: scale(0.8);
+  margin: -6px;
+}
+.companion-face {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 72px;
+  border: 3px solid var(--color-ink);
+  border-radius: 46% 46% 42% 42%;
+  background-color: #f3c65c;
+  box-shadow: 4px 4px 0 var(--color-ink);
+}
+[data-theme='dark'] .companion-face {
+  border-color: #f2ede4;
+  box-shadow: 4px 4px 0 #000;
+}
+.companion-eyes {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--color-ink);
+  user-select: none;
+}
+.companion-mouth {
+  font-family: var(--font-editorial);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-top: -2px;
+  user-select: none;
+}
+.companion-leaf {
+  position: absolute;
+  top: -8px;
+  left: 14px;
+  width: 14px;
+  height: 24px;
+  border: 2.5px solid var(--color-ink);
+  border-radius: 100% 0 100% 0;
+  background-color: var(--color-leaf);
+  transform: rotate(-25deg);
+}
+.companion-arm {
+  position: absolute;
+  top: 46px;
+  width: 22px;
+  height: 13px;
+  border: 2.5px solid var(--color-ink);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+}
+.arm-left  { left: -6px;  transform: rotate(20deg); }
+.arm-right { right: -6px; transform: rotate(-20deg); }
+.arm-focused { top: 40px; transform: rotate(-15deg); }
+.companion-feet { display: flex; gap: 16px; margin-top: 2px; }
+.companion-feet i {
+  width: 13px;
+  height: 7px;
+  border: 2.5px solid var(--color-ink);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+.companion-spark {
+  position: absolute;
+  color: var(--color-coral);
+  font-size: 14px;
+  animation: sparkle-pop 0.6s infinite alternate ease-in-out;
+}
+.spark-one { right: -10px; top: 15px; }
+.spark-two { left: -12px;  top: 45px; animation-delay: 0.25s !important; }
+.companion-zz {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  font-family: var(--font-editorial);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-muted);
+  animation: float-z 2s infinite ease-in-out;
+}
